@@ -5,21 +5,23 @@ import (
 	"testing"
 )
 
-func Test_proberKeys_getAudios(t *testing.T) {
-	tests := []struct {
-		name string
-		mp   proberKeys
-		want map[int]string
-	}{
-		// TODO: Add test cases.
+func Test_Mac_getAudios(t *testing.T) {
+	macprober := getPlatformProber()
+	want := []string{"0  Built-in Microphone"}
+	macprober.probeDevices()
+	if got := macprober.getDevices().audios; !reflect.DeepEqual(got, want) {
+		t.Errorf("proberKeys.getAudios() = %v, want %v", got, want)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mp := proberKeys{}
-			if got := mp.getAudios(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("proberKeys.getAudios() = %v, want %v", got, tt.want)
-			}
-		})
+}
+
+func Test_Mac_getCmd(t *testing.T) {
+	macprober := getPlatformProber()
+	want := []string{"ffmpeg", "-y", "-report", "-f", "avfoundation", "-framerate", "24", "-i", "1", "-framerate", "25", "-s", "1920x1080", "TODO.mkv"}
+	macprober.probeDevices()
+	opts := options{vidIdx: 1}
+	macprober.setOptions(opts)
+	if got := macprober.getCommand(); !reflect.DeepEqual(got, want) {
+		t.Errorf("proberKeys.getAudios() = %#v, want %v", got, want)
 	}
 }
 
@@ -45,7 +47,8 @@ func Test_parseFfmpegDevices(t *testing.T) {
 		dtype string
 		want  []string
 	}{
-		{"mac", "audio", []string{"0] Built-in Microphone"}},
+		{"mac", "audio", []string{"0  Built-in Microphone"}},
+		// {"macvideo", "video", []string{"0] Built-in Microphone"}},
 	}
 	// TODO: mock cmd
 	for _, tt := range tests {
