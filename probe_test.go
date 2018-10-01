@@ -16,12 +16,12 @@ func Test_Mac_getAudios(t *testing.T) {
 
 func Test_Mac_getCmd(t *testing.T) {
 	macprober := getPlatformProber()
-	want := []string{"ffmpeg", "-y", "-report", "-f", "avfoundation", "-framerate", "24", "-i", "1", "-framerate", "25", "-s", "1920x1080", "TODO.mkv"}
+	want := []string{"ffmpeg", "-y"}
 	macprober.probeDevices()
-	opts := options{vidIdx: 1}
+	opts := options{vidIdx: 1, audIdx: 0}
 	macprober.setOptions(opts)
-	if got := macprober.getCommand(); !reflect.DeepEqual(got, want) {
-		t.Errorf("proberKeys.getAudios() = %#v, want %v", got, want)
+	if got := macprober.getCommand(); !reflect.DeepEqual(got[0:2], want) {
+		t.Errorf("proberKeys.getAudios() = %#v, want %v", got[0:2], want)
 	}
 }
 
@@ -29,9 +29,7 @@ func Test_getPlatformProber(t *testing.T) {
 	tests := []struct {
 		name string
 		want Prober
-	}{
-		// TODO: Add test cases HERE!!!
-	}
+	}{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := getPlatformProber(); !reflect.DeepEqual(got, tt.want) {

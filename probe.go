@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -11,6 +15,9 @@ type Prober interface {
 	setOptions(opts options)
 	getCommand() []string
 	getVersion() string
+	start()
+	stop()
+	runCmdPipe([]string) //error //TODO private not expose?
 }
 
 type devices struct {
@@ -30,18 +37,20 @@ type proberKeys struct {
 	recordCmdPostfix []string
 	devicesKey       string
 	deviceKey        string //input device
+	done             chan bool
+	started          bool
 	devices
 	options
 }
 
 var macProber = proberKeys{
-	deviceKey:  "input device",
-	devicesCmd: "ffmpeg -f avfoundation -list_devices true -i ''",
-	//TODO env FFREPORT=file=ffreport.log:level=32
-	recordCmdPrefix: strings.Split("ffmpeg -y -report -f avfoundation -framerate 24", " "),
-	//ffmpeg -y -video_size 1024x768 -framerate 5 -f avfoundation -i "3"  TODO.mkv
+	deviceKey:       "input device",
+	devicesCmd:      "ffmpeg -f avfoundation -list_devices true -i ''",
+	recordCmdPrefix: strings.Split("ffmpeg -y -f avfoundation -framerate 24", " "),
+	// TODO: -s scale, resolution input oputpu
 	recordCmdPostfix: strings.Split("-framerate 25 -s 1920x1080 TODO.mkv", " "), //-preset ultrafast aaa.mkv
 	devicesKey:       "devices:",
+	done:             make(chan bool),
 }
 
 func parseFfmpegDevices(pk proberKeys, dtype string) []string {
@@ -91,15 +100,57 @@ func (mp proberKeys) getVersion() string {
 func (mp proberKeys) getCommand() (cmd []string) {
 	cmd = append(cmd, mp.recordCmdPrefix...)
 	cmd = append(cmd, "-i")
-	cmd = append(cmd, "1")
-	// cmd = append(cmd, fmt.Sprintf("%d:%d", mp.options.vidIdx, mp.options.audIdx))
+	// TODO: without audio
+	cmd = append(cmd, fmt.Sprintf("%d:%d", mp.options.vidIdx, mp.options.audIdx))
 	cmd = append(cmd, mp.recordCmdPostfix...)
 	if len(mp.ffmpegOpts) > 1 {
 		cmd = append(cmd, mp.ffmpegOpts...)
 	}
-	// runCmdPipe(cmd)
 	// runCmdPipe(strings.Split("ls -lR ..", " "))
 	return cmd
+}
+
+func (mp *proberKeys) runCmdPipe(cmdstr []string) { //TODO ret error
+	log.Info(cmdstr)
+	cmd := exec.Command(cmdstr[0], cmdstr[1:]...)
+	cmd.Stdout = os.Stdout //TODO use logger and txtarea
+	cmd.Stderr = os.Stderr
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		<-mp.done
+		log.Info("Received stop signal. Sending quit")
+		defer stdin.Close()
+		io.WriteString(stdin, "q")
+		// io.WriteString(stdin, "+") TODO send keys for more/less status
+		cmd.Wait()
+		mp.done <- true //signal process done
+	}()
+}
+
+func (mp *proberKeys) start() {
+	if !mp.started {
+		cmd := mp.getCommand()
+		mp.started = true
+		mp.runCmdPipe(cmd)
+	} else {
+		log.Errorf("already started")
+	}
+}
+
+func (mp *proberKeys) stop() {
+	if mp.started {
+		mp.done <- true //send done signal and..
+		<-mp.done       //wait for process done
+		mp.started = false
+	} else {
+		log.Errorf("already stopped")
+	}
 }
 
 func getPlatformProber() Prober {
