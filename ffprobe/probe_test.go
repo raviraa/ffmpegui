@@ -8,7 +8,7 @@ import (
 
 func Test_Mac_getDevices(t *testing.T) {
 	want := []string{"0  Built-in Microphone"}
-	got := GetFfmpegDevices(&macProber, deviceCommon, "audio").audios
+	got := GetFfmpegDevices(&macProber).audios
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("proberKeys.getAudios() = %v, want %v", got, want)
 	}
@@ -17,7 +17,7 @@ func Test_Mac_getDevices(t *testing.T) {
 func Test_Mac_getCmd(t *testing.T) {
 	macprober := GetPlatformProber()
 	want := []string{"ffmpeg", "-y"}
-	opts := options{vidIdx: 1, audIdx: 0}
+	opts := Options{VidIdx: 1, AudIdx: 0}
 	SetOptions(opts)
 	if got := getCommand(macprober); !reflect.DeepEqual(got[0:2], want) {
 		t.Errorf("proberKeys.getAudios() = %#v, want %v", got[0:2], want)
@@ -50,7 +50,7 @@ func Test_parseFfmpegDevices(t *testing.T) {
 	// TODO: mock cmd run
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseFfmpegDeviceType(&macProber, *macProber.proberCommon, tt.dtype)
+			got := parseFfmpegDeviceType(&macProber, tt.dtype)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseFfmpegDevices() = %#v, want %v", got, tt.want)
 			}
@@ -60,7 +60,7 @@ func Test_parseFfmpegDevices(t *testing.T) {
 
 func Test_StartProcessFail(t *testing.T) {
 	prober := &proberMac{recordCmdPrefix: []string{"pytho"}}
-	scanner := StartEncode(prober)
+	scanner, _ := StartEncode(prober)
 	if scanner != nil {
 		t.Errorf("expected process fail")
 	}
@@ -77,7 +77,7 @@ func Test_ProcessInterrupt(t *testing.T) {
 
 func Test_StartProcessOutput(t *testing.T) {
 	prober := &proberMac{recordCmdPrefix: []string{"echo", "success\n"}}
-	scanner := StartEncode(prober)
+	scanner, _ := StartEncode(prober)
 	var ffout string
 	done := make(chan bool)
 	go func() {

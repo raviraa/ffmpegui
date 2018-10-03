@@ -2,26 +2,29 @@ package ffprobe
 
 import (
 	"bufio"
+	"errors"
 	"strings"
 
 	logging "github.com/op/go-logging"
 )
 
-// Prober contains logic that changes based on platform
+// Prober has logic that changes based on platform
 type Prober interface {
 	getDevicesCmd() string
 	getPrefixCmd() []string
 }
 
-type devices struct {
+// Devices has information about ffmpeg multimedia devices
+type Devices struct {
 	audios []string
 	videos []string
 }
 
-type options struct {
-	audIdx     int
-	vidIdx     int
-	ffmpegOpts []string
+// Options configures ffmpeg encoding process
+type Options struct {
+	AudIdx int
+	VidIdx int
+	// ffmpegOpts []string
 }
 
 type proberCommon struct {
@@ -30,8 +33,8 @@ type proberCommon struct {
 	deviceKey        string //input device
 	done             chan bool
 	started          bool
-	devices
-	options
+	Devices
+	Options
 }
 
 var log = logging.MustGetLogger("probe")
@@ -57,22 +60,22 @@ func filterList(ss []string, f func(string) bool) (res []string) {
 }
 
 // GetFfmpegDevices returns audio and video devices available
-func GetFfmpegDevices(prober Prober, pk proberCommon, dtype string) devices {
-	devs := devices{}
-	devs.audios = parseFfmpegDeviceType(prober, pk, "audio")
-	devs.videos = parseFfmpegDeviceType(prober, pk, "video")
+func GetFfmpegDevices(prober Prober) Devices {
+	devs := Devices{}
+	devs.audios = parseFfmpegDeviceType(prober, "audio")
+	devs.videos = parseFfmpegDeviceType(prober, "video")
 	return devs
 }
 
-func parseFfmpegDeviceType(prober Prober, pk proberCommon, dtype string) []string {
-	devices := map[string][]string{} //0: "Built-in Microphone"}
+func parseFfmpegDeviceType(prober Prober, dtype string) []string {
+	devs := map[string][]string{}
 	res := runCmdStr(prober.getDevicesCmd(), true)
 	resLines := strings.Split(res, "\n")
-	filterfn := func(s string) bool { return strings.Contains(s, pk.deviceKey) }
+	filterfn := func(s string) bool { return strings.Contains(s, deviceCommon.deviceKey) }
 	resLines = filterList(resLines, filterfn)
 	var currDevType, dtypeKey string
 	for _, ln := range resLines {
-		if strings.Contains(ln, pk.devicesKey) {
+		if strings.Contains(ln, deviceCommon.devicesKey) {
 			currDevType = ln
 			if strings.Contains(ln, dtype) {
 				dtypeKey = ln
@@ -82,17 +85,17 @@ func parseFfmpegDeviceType(prober Prober, pk proberCommon, dtype string) []strin
 			if len(lnprsds) == 2 {
 				lnprsd := lnprsds[1]
 				lnprsd = strings.Replace(lnprsd, "]", " ", -1)
-				devices[currDevType] = append(devices[currDevType], lnprsd)
+				devs[currDevType] = append(devs[currDevType], lnprsd)
 			}
 		}
 	}
-	log.Debugf("%s: %+v\n", dtype, devices[dtypeKey])
-	return devices[dtypeKey]
+	log.Debugf("%s: %+v\n", dtype, devs[dtypeKey])
+	return devs[dtypeKey]
 }
 
 // SetOptions configures extra encoder options
-func SetOptions(opts options) {
-	deviceCommon.options = opts
+func SetOptions(opts Options) {
+	deviceCommon.Options = opts
 }
 
 func getVersion() string {
@@ -100,29 +103,30 @@ func getVersion() string {
 }
 
 func getCommand(prober Prober) (cmd []string) {
-	mp := deviceCommon
 	cmd = append(cmd, prober.getPrefixCmd()...)
-	if len(mp.ffmpegOpts) > 1 {
-		cmd = append(cmd, mp.ffmpegOpts...)
-	}
+	cmd = append(cmd, "-i", "1:0", "TODO.mp4")
+	// if len(mp.ffmpegOpts) > 1 {
+	// 	cmd = append(cmd, mp.ffmpegOpts...)
+	// }
 	// runCmdPipe(strings.Split("ls -lR ..", " "))
 	return cmd
 }
 
 // StartEncode starts ffmpeg process with configured options
-func StartEncode(prober Prober) *bufio.Scanner {
+// and returns stdout scanner
+func StartEncode(prober Prober) (*bufio.Scanner, error) {
 	if !deviceCommon.started {
 		cmd := getCommand(prober)
 		scanner, err := deviceCommon.runCmdPipe(cmd)
 		if err == nil {
 			deviceCommon.started = true
-			return scanner
+			return scanner, nil
 		}
 		log.Errorf("StartEncode failed" + err.Error())
-	} else {
-		log.Errorf("already started")
+		return nil, err
 	}
-	return nil
+	log.Errorf("already started")
+	return nil, errors.New("already started")
 }
 
 // StopEncode stop ffmpeg process
@@ -141,5 +145,6 @@ func StopEncode() bool {
 // GetPlatformProber returns prober for correct platform
 func GetPlatformProber() Prober {
 	var prober Prober = &macProber
+	GetFfmpegDevices(prober)
 	return prober
 }

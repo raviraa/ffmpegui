@@ -1,9 +1,11 @@
 package main
 
+/*
 import (
 	"strings"
 
 	"github.com/andlabs/ui"
+	"github.com/raviraa/recordscreen/ffprobe"
 )
 
 var (
@@ -13,12 +15,13 @@ var (
 	cboxVid    *ui.Combobox
 	mwin       *ui.Window
 	// txtStatus  strings.Builder
-	prober Prober
+	prober ffprobe.Prober
 )
+
 
 func onStartClicked(btn *ui.Button) {
 	log.Info("start clicked..")
-	opts := options{
+	opts := ffprobe.Options{
 		vidIdx: cboxVid.Selected(),
 		audIdx: cboxAud.Selected(),
 	}
@@ -122,8 +125,8 @@ func mainUI() {
 	log.Info("Exiting")
 }
 
+*/
 func main() {
-	checkRequirements()
-	// mainCli()
-	mainUI()
+	mainCli()
+	// mainUI()
 }
