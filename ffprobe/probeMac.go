@@ -10,7 +10,7 @@ type proberMac struct {
 
 var macProber = proberMac{
 	devicesCmd:      "ffmpeg -f avfoundation -list_devices true -i ''",
-	recordCmdPrefix: strings.Split("ffmpeg -y -f avfoundation -framerate 24", " "),
+	recordCmdPrefix: strings.Split("ffmpeg -y -loglevel verbose -f avfoundation -framerate 24", " "),
 	proberCommon:    &deviceCommon,
 }
 

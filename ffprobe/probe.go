@@ -16,8 +16,8 @@ type Prober interface {
 
 // Devices has information about ffmpeg multimedia devices
 type Devices struct {
-	audios []string
-	videos []string
+	Audios []string
+	Videos []string
 }
 
 // Options configures ffmpeg encoding process
@@ -62,8 +62,8 @@ func filterList(ss []string, f func(string) bool) (res []string) {
 // GetFfmpegDevices returns audio and video devices available
 func GetFfmpegDevices(prober Prober) Devices {
 	devs := Devices{}
-	devs.audios = parseFfmpegDeviceType(prober, "audio")
-	devs.videos = parseFfmpegDeviceType(prober, "video")
+	devs.Audios = parseFfmpegDeviceType(prober, "audio")
+	devs.Videos = parseFfmpegDeviceType(prober, "video")
 	return devs
 }
 
@@ -102,9 +102,11 @@ func getVersion() string {
 	return "ffmpeg 1234.22" //TODO
 }
 
+// ffmpeg -y  -framerate 5 -video_size 1024x768 -f avfoundation -i 1 TODO.mkv
 func getCommand(prober Prober) (cmd []string) {
 	cmd = append(cmd, prober.getPrefixCmd()...)
-	cmd = append(cmd, "-i", "1:0", "TODO.mp4")
+	cmd = append(cmd, "-i", "1:0") //TODO
+	cmd = append(cmd, deviceCommon.recordCmdPostfix...)
 	// if len(mp.ffmpegOpts) > 1 {
 	// 	cmd = append(cmd, mp.ffmpegOpts...)
 	// }

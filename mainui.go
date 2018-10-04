@@ -1,9 +1,6 @@
 package main
 
-/*
 import (
-	"strings"
-
 	"github.com/andlabs/ui"
 	"github.com/raviraa/recordscreen/ffprobe"
 )
@@ -15,21 +12,9 @@ var (
 	cboxVid    *ui.Combobox
 	mwin       *ui.Window
 	// txtStatus  strings.Builder
-	prober ffprobe.Prober
+	prober           ffprobe.Prober
+	updateFrameCount = 9 // update frame status every n ffmpeg updates
 )
-
-
-func onStartClicked(btn *ui.Button) {
-	log.Info("start clicked..")
-	opts := ffprobe.Options{
-		vidIdx: cboxVid.Selected(),
-		audIdx: cboxAud.Selected(),
-	}
-	prober.setOptions(opts)
-	cmd := prober.getCommand()
-	prober.start()
-	ctrlStatus.Append(strings.Join(cmd, " ") + "\n")
-}
 
 func makeInputForm() *ui.Group {
 	group := ui.NewGroup("Options")
@@ -60,15 +45,14 @@ func makeInputForm() *ui.Group {
 func beginUIProbe() {
 
 	log.Info("Starting in GUI mode")
-	prober = getPlatformProber()
-	prober.probeDevices()
+	prober = ffprobe.GetPlatformProber()
 	ui.QueueMain(func() {
-		lblDesc.SetText(prober.getVersion())
-		devs := prober.getDevices()
-		for _, s := range devs.audios {
+		// lblDesc.SetText(ffprobe.getversio)TODO
+		devs := ffprobe.GetFfmpegDevices(prober)
+		for _, s := range devs.Audios {
 			cboxAud.Append(s)
 		}
-		for _, s := range devs.videos {
+		for _, s := range devs.Videos {
 			cboxVid.Append(s)
 		}
 	})
@@ -80,7 +64,7 @@ func setupUI() {
 	mwin = ui.NewWindow("Record screen, webcam using ffmpeg", 400, 400, false)
 	mwin.SetMargined(true)
 	mwin.OnClosing(func(mw *ui.Window) bool {
-		prober.stop()
+		ffprobe.StopEncode()
 		mwin.Destroy()
 		ui.Quit()
 		return false
@@ -111,7 +95,7 @@ func setupUI() {
 	btnstart.OnClicked(onStartClicked)
 	btnstop := ui.NewButton("Stop")
 	btnstop.OnClicked(func(btn *ui.Button) {
-		prober.stop()
+		ffprobe.StopEncode() //TODO chekc err
 	})
 	btnhbox.Append(btnstop, false)
 
@@ -125,8 +109,7 @@ func mainUI() {
 	log.Info("Exiting")
 }
 
-*/
 func main() {
-	mainCli()
-	// mainUI()
+	// mainCli()
+	mainUI()
 }

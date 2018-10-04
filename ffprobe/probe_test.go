@@ -8,7 +8,7 @@ import (
 
 func Test_Mac_getDevices(t *testing.T) {
 	want := []string{"0  Built-in Microphone"}
-	got := GetFfmpegDevices(&macProber).audios
+	got := GetFfmpegDevices(&macProber).Audios
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("proberKeys.getAudios() = %v, want %v", got, want)
 	}

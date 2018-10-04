@@ -34,12 +34,13 @@ func runCmdStr(cmd string, ignExitCode bool) string {
 func (mp *proberCommon) runCmdPipe(cmdstr []string) (*bufio.Scanner, error) { //TODO ret error
 	log.Info(cmdstr)
 	cmd := exec.Command(cmdstr[0], cmdstr[1:]...)
-	cmd.Stderr = os.Stderr
+	// cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
-	stdout, err := cmd.StdoutPipe()
+	stdout, err := cmd.StderrPipe()
 	if err != nil {
 		return nil, err
 	}
