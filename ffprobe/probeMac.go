@@ -19,9 +19,6 @@ func (pm *proberMac) getDevicesCmd() string {
 }
 
 func (pm *proberMac) getPrefixCmd() []string {
-	// cmd = append(cmd, "-i")
-	// // TODO: without audio
-	// cmd = append(cmd, fmt.Sprintf("%d:%d", mp.options.vidIdx, mp.options.audIdx))
-	// cmd = append(cmd, mp.recordCmdPostfix...)
+	// conf
 	return pm.recordCmdPrefix
 }

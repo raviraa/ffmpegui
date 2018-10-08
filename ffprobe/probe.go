@@ -3,6 +3,7 @@ package ffprobe
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"strings"
 
 	logging "github.com/op/go-logging"
@@ -24,30 +25,28 @@ type Devices struct {
 type Options struct {
 	AudIdx int
 	VidIdx int
-	// ffmpegOpts []string
 }
 
 type proberCommon struct {
-	recordCmdPostfix []string
-	devicesKey       string
-	deviceKey        string //input device
-	done             chan bool
-	started          bool
+	devicesKey string
+	deviceKey  string //input device
+	done       chan bool
+	started    bool
 	Devices
-	Options
 }
 
-var log = logging.MustGetLogger("probe")
+var log *logging.Logger
 
-// Log TODO, how to initialize once?
-var Log = log
+func SetLogger() *logging.Logger {
+	log = logging.MustGetLogger("probe")
+	return log
+}
 
 var deviceCommon = proberCommon{
 	deviceKey: "input device",
 	// TODO: -s scale, resolution input oputpu
-	recordCmdPostfix: strings.Split("-framerate 25 -s 1920x1080 TODO.mkv", " "), //-preset ultrafast aaa.mkv
-	devicesKey:       "devices:",
-	done:             make(chan bool),
+	devicesKey: "devices:",
+	done:       make(chan bool),
 }
 
 func filterList(ss []string, f func(string) bool) (res []string) {
@@ -95,22 +94,21 @@ func parseFfmpegDeviceType(prober Prober, dtype string) []string {
 
 // SetOptions configures extra encoder options
 func SetOptions(opts Options) {
-	deviceCommon.Options = opts
+	aucfg := config.Inputs["audio"]
+	aucfg.I = fmt.Sprintf("none:%d", opts.AudIdx)
+	vicfg := config.Inputs["video"]
+	vicfg.I = fmt.Sprintf("%d:none", opts.VidIdx)
+	vicfg.F = "avfoundation"
+	aucfg.F = "avfoundation"
 }
 
 func getVersion() string {
 	return "ffmpeg 1234.22" //TODO
 }
 
-// ffmpeg -y  -framerate 5 -video_size 1024x768 -f avfoundation -i 1 TODO.mkv
 func getCommand(prober Prober) (cmd []string) {
 	cmd = append(cmd, prober.getPrefixCmd()...)
 	cmd = append(cmd, "-i", "1:0") //TODO
-	cmd = append(cmd, deviceCommon.recordCmdPostfix...)
-	// if len(mp.ffmpegOpts) > 1 {
-	// 	cmd = append(cmd, mp.ffmpegOpts...)
-	// }
-	// runCmdPipe(strings.Split("ls -lR ..", " "))
 	return cmd
 }
 
@@ -148,5 +146,6 @@ func StopEncode() bool {
 func GetPlatformProber() Prober {
 	var prober Prober = &macProber
 	GetFfmpegDevices(prober)
+	loadCommonConfig()
 	return prober
 }

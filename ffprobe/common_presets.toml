@@ -1,0 +1,63 @@
+
+[inputs_defaults]
+thread_queue_size = 512
+
+[inputs]
+# -video_size 1920x1080 -framerate 25 -thread_queue_size 512  -f avfoundation -i 3:none \
+[inputs.video]
+video_size = "1920x1080"
+framerate = "25"
+[inputs.audio]
+
+
+[containers]
+"webm - vp9 realtime with opus default" =   ["vp9-realtime", "opus-default"]
+"webm - vp9 realtime with opus voice" =   ["vp9-realtime", "opus-voice"]
+"webm - vp9 default with no audio" = ["vp9-default"]
+"webm - vp9 default with opus default" =   ["vp9-default", "opus-default"]
+
+[outputs]
+#  -map 1:v -c:v vp9 -s 1920x1080 -framerate 25  -benchmark -speed 5 -tile-columns 6 -frame-parallel 1 -threads 8 -static-thresh 0 -max-intra-rate 300 -deadline realtime  -crf 9 -lag-in-frames 9 -row-mt 1 -error-resilient 1 TODO.webm
+# TODO
+[outputs.video]
+s = "1920x1080"
+framerate = "25"
+
+[presets]
+
+[presets.opus-default]
+fileext = 'opus'
+type = 'a'
+codec = 'libopus'
+
+[presets.vp9-default]
+fileext = "webm"
+type = "v"
+codec = "vp9"
+
+[presets.opus-voice]
+fileext = 'opus'
+type = 'a'
+codec = 'libopus'
+b = '32k'
+application = 'voip'
+# cutoff = 4000
+
+
+[presets.vp9-realtime]
+fileext = "webm"
+type = "v"
+codec = "vp9"
+speed=5
+tile-columns=6
+frame-parallel=1
+threads=8
+static-thresh=0
+max-intra-rate=300
+deadline="realtime"
+crf=9
+lag-in-frames=9
+row-mt=1
+error-resilient=1
+
+

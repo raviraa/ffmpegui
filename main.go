@@ -9,7 +9,7 @@ import (
 	"github.com/raviraa/recordscreen/ffprobe"
 )
 
-var log = ffprobe.Log
+var log = ffprobe.SetLogger()
 
 func beginCli() {
 	// log.Info("Starting in CLI")

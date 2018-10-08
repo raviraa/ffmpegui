@@ -5,9 +5,8 @@
 ## TODO
 
 * linux support
-* encoding profiles, quality, bitrate, conf file
 * better input and output resolution configuration
-* capture selected application window(s)
+* capture selected application window(s), robotgo?
 * support for input videos to transcode
 * configuration profiles
 * tray icon with status and stop, pause support
