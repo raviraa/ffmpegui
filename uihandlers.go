@@ -12,9 +12,11 @@ import (
 func onStartClicked(btn *ui.Button) {
 	log.Info("start clicked..")
 	opts := ffprobe.Options{
-		VidIdx: cboxVid.Selected(),
-		AudIdx: cboxAud.Selected(),
+		VidIdx:    cboxVid.Selected(),
+		AudIdx:    cboxAud.Selected(),
+		Container: cboxCtnr.Selected(),
 	}
+	log.Info(opts)
 	ffprobe.SetOptions(opts)
 	ffstderr, err := ffprobe.StartEncode(prober)
 	readWritepipe(ffstderr)

@@ -10,6 +10,7 @@ var (
 	ctrlStatus *ui.MultilineEntry
 	cboxAud    *ui.Combobox
 	cboxVid    *ui.Combobox
+	cboxCtnr   *ui.Combobox
 	mwin       *ui.Window
 	// txtStatus  strings.Builder
 	prober           ffprobe.Prober
@@ -26,9 +27,10 @@ func makeInputForm() *ui.Group {
 	vbox.Append(entryForm, false)
 	entryForm.SetPadded(true)
 
+	cboxCtnr = ui.NewCombobox()
+	entryForm.Append("Profiles", cboxCtnr, false)
 	cboxVid = ui.NewCombobox()
 	entryForm.Append("Video Device", cboxVid, false)
-	entryForm.Append("Record Audio", ui.NewCheckbox(""), false)
 	cboxAud = ui.NewCombobox()
 	entryForm.Append("Audio Device", cboxAud, false)
 
@@ -54,6 +56,9 @@ func beginUIProbe() {
 		}
 		for _, s := range devs.Videos {
 			cboxVid.Append(s)
+		}
+		for _, s := range ffprobe.GetContainers() {
+			cboxCtnr.Append(s)
 		}
 	})
 	// cmd := prober.getCommand()

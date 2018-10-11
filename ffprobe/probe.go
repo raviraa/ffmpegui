@@ -3,7 +3,6 @@ package ffprobe
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"strings"
 
 	logging "github.com/op/go-logging"
@@ -12,7 +11,7 @@ import (
 // Prober has logic that changes based on platform
 type Prober interface {
 	getDevicesCmd() string
-	getPrefixCmd() []string
+	getFfmpegCmd() []string
 }
 
 // Devices has information about ffmpeg multimedia devices
@@ -25,6 +24,9 @@ type Devices struct {
 type Options struct {
 	AudIdx int
 	VidIdx int
+	// Video_size string TODO
+	Framerate int
+	Container int
 }
 
 type proberCommon struct {
@@ -37,6 +39,7 @@ type proberCommon struct {
 
 var log *logging.Logger
 
+// SetLogger starts logger, TODO memory logger
 func SetLogger() *logging.Logger {
 	log = logging.MustGetLogger("probe")
 	return log
@@ -92,23 +95,12 @@ func parseFfmpegDeviceType(prober Prober, dtype string) []string {
 	return devs[dtypeKey]
 }
 
-// SetOptions configures extra encoder options
-func SetOptions(opts Options) {
-	aucfg := config.Inputs["audio"]
-	aucfg.I = fmt.Sprintf("none:%d", opts.AudIdx)
-	vicfg := config.Inputs["video"]
-	vicfg.I = fmt.Sprintf("%d:none", opts.VidIdx)
-	vicfg.F = "avfoundation"
-	aucfg.F = "avfoundation"
-}
-
 func getVersion() string {
 	return "ffmpeg 1234.22" //TODO
 }
 
 func getCommand(prober Prober) (cmd []string) {
-	cmd = append(cmd, prober.getPrefixCmd()...)
-	cmd = append(cmd, "-i", "1:0") //TODO
+	cmd = append(cmd, prober.getFfmpegCmd()...)
 	return cmd
 }
 
@@ -146,6 +138,12 @@ func StopEncode() bool {
 func GetPlatformProber() Prober {
 	var prober Prober = &macProber
 	GetFfmpegDevices(prober)
-	loadCommonConfig()
+	loadCommonConfig(configFile())
+	// Default config Options
+	config.options = Options{
+		Framerate: 25,
+		AudIdx:    -1,
+		VidIdx:    -1,
+	}
 	return prober
 }

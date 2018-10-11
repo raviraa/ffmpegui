@@ -14,14 +14,14 @@ var log = ffprobe.SetLogger()
 func beginCli() {
 	// log.Info("Starting in CLI")
 	prober := ffprobe.GetPlatformProber()
-	// devs := ffprobe.GetFfmpegDevices(prober)
 	opts := ffprobe.Options{}
-	opts.VidIdx = 1
+	opts.VidIdx = 3
+	opts.Container = 0
 	ffprobe.SetOptions(opts)
 	stdout, _ := ffprobe.StartEncode(prober)
 	readStdout(stdout)
 	log.Info("before sleep")
-	time.Sleep(4 * time.Second)
+	time.Sleep(20 * time.Second)
 	log.Info("sending stop signal")
 	ffprobe.StopEncode()
 }

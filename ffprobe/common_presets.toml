@@ -1,13 +1,18 @@
 
+[ffconf]
+ffcmdprefix = 'ffmpeg -benchmark -y -loglevel verbose'
+
 [inputs_defaults]
 thread_queue_size = 512
 
 [inputs]
 # -video_size 1920x1080 -framerate 25 -thread_queue_size 512  -f avfoundation -i 3:none \
-[inputs.video]
-video_size = "1920x1080"
-framerate = "25"
-[inputs.audio]
+[inputs.mac.v]
+f = 'avfoundation'
+i = '%d:none'
+[inputs.mac.a]
+f = 'avfoundation'
+i = 'none:%d'
 
 
 [containers]
@@ -39,9 +44,10 @@ codec = "vp9"
 fileext = 'opus'
 type = 'a'
 codec = 'libopus'
-b = '32k'
+"b:a" = '32k'
 application = 'voip'
-# cutoff = 4000
+af = "highpass=f=200, lowpass=f=1000"
+
 
 
 [presets.vp9-realtime]
