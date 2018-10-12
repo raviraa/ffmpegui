@@ -1,24 +1,31 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/andlabs/ui"
-	"github.com/raviraa/recordscreen/ffprobe"
+	"github.com/raviraa/ffmpegui/ffprobe"
 )
 
+type inputControls struct {
+	inpbox   *ui.Box
+	ffinputs []*ffprobe.UIInput
+}
+
 var (
-	lblDesc    *ui.Label
-	ctrlStatus *ui.MultilineEntry
-	cboxAud    *ui.Combobox
-	cboxVid    *ui.Combobox
-	cboxCtnr   *ui.Combobox
-	mwin       *ui.Window
-	// txtStatus  strings.Builder
+	lblDesc          *ui.Label
+	ctrlStatus       *ui.MultilineEntry
+	mwin             *ui.Window
+	inps             *inputControls
 	prober           ffprobe.Prober
 	updateFrameCount = 9 // update frame status every n ffmpeg updates
 )
 
-func makeInputForm() *ui.Group {
-	group := ui.NewGroup("Options")
+func addInput(idx int, typ ffprobe.Avtype) *ui.Group {
+	uiip := ffprobe.UIInput{Devidx: -1, Presetidx: -1, Type: typ}
+	inps.ffinputs = append(inps.ffinputs, &uiip)
+	group := ui.NewGroup(fmt.Sprintf("Input %d", idx))
+	inps.inpbox.Append(group, false)
 	group.SetMargined(true)
 	vbox := ui.NewVerticalBox()
 	group.SetChild(vbox)
@@ -27,12 +34,30 @@ func makeInputForm() *ui.Group {
 	vbox.Append(entryForm, false)
 	entryForm.SetPadded(true)
 
-	cboxCtnr = ui.NewCombobox()
-	entryForm.Append("Profiles", cboxCtnr, false)
-	cboxVid = ui.NewCombobox()
-	entryForm.Append("Video Device", cboxVid, false)
-	cboxAud = ui.NewCombobox()
-	entryForm.Append("Audio Device", cboxAud, false)
+	cboxDevs := ui.NewCombobox()
+	entryForm.Append("Devices", cboxDevs, false)
+	devs := ffprobe.GetFfmpegDevices(prober)
+	switch typ {
+	case ffprobe.Audio:
+		for _, s := range devs.Audios {
+			cboxDevs.Append(s)
+		}
+	case ffprobe.Video:
+		for _, s := range devs.Videos {
+			cboxDevs.Append(s)
+		}
+	}
+	cboxDevs.OnSelected(func(cb *ui.Combobox) {
+		uiip.Devidx = cb.Selected()
+	})
+	cboxPresets := ui.NewCombobox()
+	entryForm.Append("Presets", cboxPresets, false)
+	cboxPresets.OnSelected(func(cb *ui.Combobox) {
+		uiip.Presetidx = cb.Selected()
+	})
+	for _, s := range ffprobe.GetPresets() {
+		cboxPresets.Append(s)
+	}
 
 	btnfile := ui.NewButton("...")
 	entryForm.Append("Save As", btnfile, false)
@@ -45,24 +70,9 @@ func makeInputForm() *ui.Group {
 }
 
 func beginUIProbe() {
-
 	log.Info("Starting in GUI mode")
-	prober = ffprobe.GetPlatformProber()
-	ui.QueueMain(func() {
-		// lblDesc.SetText(ffprobe.getversio)TODO
-		devs := ffprobe.GetFfmpegDevices(prober)
-		for _, s := range devs.Audios {
-			cboxAud.Append(s)
-		}
-		for _, s := range devs.Videos {
-			cboxVid.Append(s)
-		}
-		for _, s := range ffprobe.GetContainers() {
-			cboxCtnr.Append(s)
-		}
-	})
-	// cmd := prober.getCommand()
-	// log.Info("Using cmd:", cmd)
+	prober = ffprobe.NewProber()
+	lblDesc.SetText(ffprobe.GetVersion())
 }
 
 func setupUI() {
@@ -82,15 +92,31 @@ func setupUI() {
 	mvbox := ui.NewVerticalBox()
 	mwin.SetChild(mvbox)
 
-	lblDesc = ui.NewLabel("")
-	mvbox.Append(lblDesc, false)
-
-	mvbox.Append(makeInputForm(), false)
+	btnaddbox := ui.NewHorizontalBox()
+	mvbox.Append(btnaddbox, false)
+	btnaddinp := ui.NewButton("Add Video")
+	btnaddbox.Append(btnaddinp, false)
+	btnaddinp.OnClicked(func(*ui.Button) {
+		inpidx := len(inps.ffinputs)
+		addInput(inpidx, ffprobe.Video)
+	})
+	btnaddaud := ui.NewButton("Add Audio")
+	btnaddbox.Append(btnaddaud, false)
+	btnaddaud.OnClicked(func(*ui.Button) {
+		inpidx := len(inps.ffinputs)
+		addInput(inpidx, ffprobe.Audio)
+	})
+	inps = &inputControls{}
+	inps.inpbox = ui.NewHorizontalBox()
+	mvbox.Append(inps.inpbox, false)
+	// mvbox.Append(makeInputForm(), false)
 	mvbox.Append(ui.NewHorizontalSeparator(), false)
 	ctrlStatus = ui.NewMultilineEntry()
 	mvbox.Append(ctrlStatus, true)
 	ctrlStatus.SetReadOnly(true)
 
+	lblDesc = ui.NewLabel("")
+	mvbox.Append(lblDesc, false)
 	mvbox.Append(ui.NewHorizontalSeparator(), false)
 	btnhbox := ui.NewHorizontalBox()
 	mvbox.Append(btnhbox, false)

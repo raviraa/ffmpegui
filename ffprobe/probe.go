@@ -20,14 +20,12 @@ type Devices struct {
 	Videos []string
 }
 
-// Options configures ffmpeg encoding process
-type Options struct {
-	AudIdx int
-	VidIdx int
-	// Video_size string TODO
-	Framerate int
-	Container int
-}
+type plt int
+
+const (
+	lin plt = iota
+	mac     //TODO use this
+)
 
 type proberCommon struct {
 	devicesKey string
@@ -35,6 +33,24 @@ type proberCommon struct {
 	done       chan bool
 	started    bool
 	Devices
+}
+
+// Options configures ffmpeg encoding process
+type Options struct {
+	// Video_size string TODO
+	UIInputs []*UIInput
+}
+
+var opts *Options
+
+func init() {
+	opts = &Options{}
+	cfgname = "common_presets.toml"
+}
+
+// SetInputs to set configure input streams
+func SetInputs(uiips []*UIInput) {
+	opts.UIInputs = uiips
 }
 
 var log *logging.Logger
@@ -95,7 +111,7 @@ func parseFfmpegDeviceType(prober Prober, dtype string) []string {
 	return devs[dtypeKey]
 }
 
-func getVersion() string {
+func GetVersion() string {
 	return "ffmpeg 1234.22" //TODO
 }
 
@@ -134,16 +150,11 @@ func StopEncode() bool {
 	return false
 }
 
-// GetPlatformProber returns prober for correct platform
-func GetPlatformProber() Prober {
+// NewProber returns prober for correct platform
+func NewProber() Prober {
 	var prober Prober = &macProber
 	GetFfmpegDevices(prober)
 	loadCommonConfig(configFile())
 	// Default config Options
-	config.options = Options{
-		Framerate: 25,
-		AudIdx:    -1,
-		VidIdx:    -1,
-	}
 	return prober
 }

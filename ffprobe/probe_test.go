@@ -2,6 +2,7 @@ package ffprobe
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -19,13 +20,12 @@ func Test_Mac_getDevices(t *testing.T) {
 }
 
 func Test_Mac_getCmd(t *testing.T) {
-	macprober := GetPlatformProber()
+	macprober := NewProber()
 	loadCommonConfig(cfgname)
-	want := []string{"ffmpeg", "-benchmark", "-y", "-loglevel", "verbose", "-thread_queue_size", "512", "-f", "avfoundation", "-i", "1:none", "-map", "0:v", "-c:v", "vp9", "0.webm"}
-	opts := Options{VidIdx: 1, AudIdx: -1, Container: 1}
-	// Preset: "webm - vp9 default with no audio"}
-	SetOptions(opts)
-	if got := getCommand(macprober); !reflect.DeepEqual(got, want) {
+	SetInputs([]*UIInput{&UIInput{Type: Audio}})
+	defer func() { opts = &Options{} }()
+	want := "ffmpeg -benchmark -y -loglevel verbose -thread_queue_size 512 -f avfoundation -i none:0 -map 0:a -c:a libopus 0.opus"
+	if got := strings.Join(getCommand(macprober), " "); !reflect.DeepEqual(got, want) {
 		t.Errorf("getCommand = %#v, want %v", got, want)
 	}
 }
@@ -37,7 +37,7 @@ func Test_getPlatformProber(t *testing.T) {
 	}{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetPlatformProber(); !reflect.DeepEqual(got, tt.want) {
+			if got := NewProber(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("getPlatformProber() = %v, want %v", got, tt.want)
 			}
 		})
@@ -64,8 +64,8 @@ func Test_parseFfmpegDevices(t *testing.T) {
 }
 
 func Test_StartProcessFail(t *testing.T) {
-	prober := GetPlatformProber()
-	config.Ffconf.Ffcmdprefix = "pytho"
+	prober := NewProber()
+	config.Ffcmdprefix = "pytho"
 	scanner, _ := StartEncode(prober)
 	if scanner != nil {
 		t.Errorf("expected process fail")
@@ -73,8 +73,8 @@ func Test_StartProcessFail(t *testing.T) {
 }
 
 func Test_ProcessInterrupt(t *testing.T) {
-	prober := GetPlatformProber()
-	config.Ffconf.Ffcmdprefix = "sleep 10"
+	prober := NewProber()
+	config.Ffcmdprefix = "sleep 10"
 	tbeg := time.Now().UnixNano()
 	StartEncode(prober)
 	if !StopEncode() || (time.Now().UnixNano()-tbeg > 1e9) {
@@ -83,8 +83,8 @@ func Test_ProcessInterrupt(t *testing.T) {
 }
 
 func Test_StartProcessOutput(t *testing.T) {
-	prober := GetPlatformProber()
-	config.Ffconf.Ffcmdprefix = "ls asdf1234"
+	prober := NewProber()
+	config.Ffcmdprefix = "ls asdf1234"
 	scanner, _ := StartEncode(prober)
 	var ffout string
 	done := make(chan bool)

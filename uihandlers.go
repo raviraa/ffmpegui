@@ -6,18 +6,13 @@ import (
 	"strings"
 
 	"github.com/andlabs/ui"
-	"github.com/raviraa/recordscreen/ffprobe"
+	"github.com/raviraa/ffmpegui/ffprobe"
 )
 
 func onStartClicked(btn *ui.Button) {
 	log.Info("start clicked..")
-	opts := ffprobe.Options{
-		VidIdx:    cboxVid.Selected(),
-		AudIdx:    cboxAud.Selected(),
-		Container: cboxCtnr.Selected(),
-	}
-	log.Info(opts)
-	ffprobe.SetOptions(opts)
+	log.Info(inps.ffinputs)
+	ffprobe.SetInputs(inps.ffinputs)
 	ffstderr, err := ffprobe.StartEncode(prober)
 	readWritepipe(ffstderr)
 	if err == nil {

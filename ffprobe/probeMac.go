@@ -6,8 +6,7 @@ type proberMac struct {
 }
 
 var macProber = proberMac{
-	devicesCmd: "ffmpeg -f avfoundation -list_devices true -i ''",
-	// recordCmdPrefix: strings.Split("ffmpeg -y -loglevel verbose -f avfoundation -framerate 24", " "),
+	devicesCmd:   "ffmpeg -f avfoundation -list_devices true -i ''", //TODO move to conf file
 	proberCommon: &deviceCommon,
 }
 
@@ -16,5 +15,5 @@ func (pm *proberMac) getDevicesCmd() string {
 }
 
 func (pm *proberMac) getFfmpegCmd() []string {
-	return getConfCmd("mac")
+	return getConfCmd("mac", *opts)
 }

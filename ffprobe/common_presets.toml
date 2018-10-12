@@ -1,6 +1,6 @@
 
-[ffconf]
 ffcmdprefix = 'ffmpeg -benchmark -y -loglevel verbose'
+framerate = 24.0
 
 [inputs_defaults]
 thread_queue_size = 512
@@ -15,18 +15,7 @@ f = 'avfoundation'
 i = 'none:%d'
 
 
-[containers]
-"webm - vp9 realtime with opus default" =   ["vp9-realtime", "opus-default"]
-"webm - vp9 realtime with opus voice" =   ["vp9-realtime", "opus-voice"]
-"webm - vp9 default with no audio" = ["vp9-default"]
-"webm - vp9 default with opus default" =   ["vp9-default", "opus-default"]
-
-[outputs]
-#  -map 1:v -c:v vp9 -s 1920x1080 -framerate 25  -benchmark -speed 5 -tile-columns 6 -frame-parallel 1 -threads 8 -static-thresh 0 -max-intra-rate 300 -deadline realtime  -crf 9 -lag-in-frames 9 -row-mt 1 -error-resilient 1 TODO.webm
-# TODO
-[outputs.video]
-s = "1920x1080"
-framerate = "25"
+#  -map 1:v -c:v vp9 -s 1920x1080 -framerate 25  -benchmark -speed 5 -tile-columns 6 -frame-parallel 1 -threads 8 -static-thresh 0 -max-intra-rate 300 -deadline realtime  -crf 9 -lag-in-frames 9 -row-mt 1 -error-resilient 1
 
 [presets]
 
@@ -51,6 +40,7 @@ af = "highpass=f=200, lowpass=f=1000"
 
 
 [presets.vp9-realtime]
+pix_fmt='yuv420p' # TODO output defaults
 fileext = "webm"
 type = "v"
 codec = "vp9"
@@ -62,7 +52,8 @@ static-thresh=0
 max-intra-rate=300
 deadline="realtime"
 crf=9
-lag-in-frames=9
+lag-in-frames=120 # 30* 4sec?
+# TODO quality min max
 row-mt=1
 error-resilient=1
 

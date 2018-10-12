@@ -6,22 +6,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raviraa/recordscreen/ffprobe"
+	"github.com/raviraa/ffmpegui/ffprobe"
 )
 
 var log = ffprobe.SetLogger()
 
 func beginCli() {
 	// log.Info("Starting in CLI")
-	prober := ffprobe.GetPlatformProber()
-	opts := ffprobe.Options{}
-	opts.VidIdx = 3
-	opts.Container = 0
-	ffprobe.SetOptions(opts)
+	prober := ffprobe.NewProber()
+	uiip := ffprobe.UIInput{Type: ffprobe.Video, Devidx: 2, Presetidx: 3}
+	ffprobe.SetInputs([]*ffprobe.UIInput{&uiip})
 	stdout, _ := ffprobe.StartEncode(prober)
 	readStdout(stdout)
 	log.Info("before sleep")
-	time.Sleep(20 * time.Second)
+	time.Sleep(5 * time.Second)
 	log.Info("sending stop signal")
 	ffprobe.StopEncode()
 }

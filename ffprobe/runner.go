@@ -31,7 +31,7 @@ func runCmdStr(cmd string, ignExitCode bool) string {
 	return ""
 }
 
-func (mp *proberCommon) runCmdPipe(cmdstr []string) (*bufio.Scanner, error) { //TODO ret error
+func (mp *proberCommon) runCmdPipe(cmdstr []string) (*bufio.Scanner, error) {
 	log.Info(cmdstr)
 	cmd := exec.Command(cmdstr[0], cmdstr[1:]...)
 	// cmd.Stderr = os.Stderr
@@ -53,8 +53,7 @@ func (mp *proberCommon) runCmdPipe(cmdstr []string) (*bufio.Scanner, error) { //
 		log.Info("Received stop signal. Sending quit")
 		defer stdin.Close()
 		cmd.Process.Signal(os.Interrupt)
-		// io.WriteString(stdin, "exit()\r\n")
-		// io.WriteString(stdin, "+") TODO send keys for more/less status
+		// io.WriteString(stdin, "+") TODO send keys for status, pause
 		cmd.Wait()
 		mp.done <- true //signal process done
 	}()
