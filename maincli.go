@@ -15,8 +15,8 @@ func beginCli() {
 	// log.Info("Starting in CLI")
 	prober := ffprobe.NewProber()
 	uiip := ffprobe.UIInput{Type: ffprobe.Video, Devidx: 2, Presetidx: 3}
-	ffprobe.SetInputs([]*ffprobe.UIInput{&uiip})
-	stdout, _ := ffprobe.StartEncode(prober)
+	ffprobe.SetInputs([]ffprobe.UIInput{uiip})
+	stdout, _ := ffprobe.StartEncode(prober, false)
 	readStdout(stdout)
 	log.Info("before sleep")
 	time.Sleep(5 * time.Second)

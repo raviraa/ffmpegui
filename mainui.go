@@ -125,9 +125,7 @@ func setupUI() {
 	btnhbox.Append(btnstart, false)
 	btnstart.OnClicked(onStartClicked)
 	btnstop := ui.NewButton("Stop")
-	btnstop.OnClicked(func(btn *ui.Button) {
-		ffprobe.StopEncode() //TODO chekc err
-	})
+	btnstop.OnClicked(onStopClicked)
 	btnhbox.Append(btnstop, false)
 
 	mwin.Show()

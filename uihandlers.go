@@ -3,24 +3,42 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"strings"
 
 	"github.com/andlabs/ui"
 	"github.com/raviraa/ffmpegui/ffprobe"
 )
 
+func onStopClicked(btn *ui.Button) {
+	stopped := ffprobe.StopEncode() //TODO enable/disable start/stop buttons
+	if stopped {
+		ffstderr, err := ffprobe.StartEncode(prober, true)
+		if err == nil {
+			ctrlStatus.Append("==============\nMuxing streams\n")
+			readWritepipe(ffstderr)
+		} else {
+			lblDesc.SetText("ffmpeg mux start failed: " + err.Error())
+		}
+
+	}
+}
+
 func onStartClicked(btn *ui.Button) {
-	log.Info("start clicked..")
-	log.Info(inps.ffinputs)
-	ffprobe.SetInputs(inps.ffinputs)
-	ffstderr, err := ffprobe.StartEncode(prober)
-	readWritepipe(ffstderr)
+	var inpsar []ffprobe.UIInput
+	for _, i := range inps.ffinputs {
+		inpsar = append(inpsar, *i)
+	}
+	log.Info(fmt.Sprintf("%#v", inpsar))
+	ffprobe.SetInputs(inpsar)
+	ffstderr, err := ffprobe.StartEncode(prober, false)
 	if err == nil {
+		ctrlStatus.Append("==============\n")
 		lblDesc.SetText("ffmpeg started succesfully")
+		readWritepipe(ffstderr)
 	} else {
 		lblDesc.SetText("ffmpeg start failed: " + err.Error())
 	}
-	// ctrlStatus.Append(strings.Join(cmd, " ") + "\n")
 }
 
 func readWritepipe(scanner *bufio.Scanner) {
@@ -42,6 +60,8 @@ func readWritepipe(scanner *bufio.Scanner) {
 				})
 			}
 		}
+		panic("todo")
+		// ffprobe.Started = false
 	}()
 }
 

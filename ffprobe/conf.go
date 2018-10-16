@@ -1,6 +1,7 @@
 package ffprobe
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -58,8 +59,12 @@ func GetPresets() (cts []string) {
 	return
 }
 
-func getPresetByIdx(cidx int) string {
-	return GetPresets()[cidx]
+func getPresetByIdx(cidx int) (string, error) {
+	ps := GetPresets()
+	if cidx >= len(ps) || cidx < 0 {
+		return "", errors.New("invalid preset")
+	}
+	return ps[cidx], nil
 }
 
 func mapToString(m map[string]interface{}) (s []string) {

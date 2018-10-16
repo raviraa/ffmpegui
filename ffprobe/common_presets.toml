@@ -38,6 +38,11 @@ application = 'voip'
 af = "highpass=f=200, lowpass=f=1000"
 
 
+[presets.h264-realtime]
+fileext = "mkv"
+type = "v"
+codec = "libx264"
+preset = "faster"  # ultrafast superfast veryfast faster fast medium – default preset slow slower veryslow placebo
 
 [presets.vp9-realtime]
 pix_fmt='yuv420p' # TODO output defaults
@@ -52,7 +57,7 @@ static-thresh=0
 max-intra-rate=300
 deadline="realtime"
 crf=9
-lag-in-frames=120 # 30* 4sec?
+lag-in-frames=9
 # TODO quality min max
 row-mt=1
 error-resilient=1

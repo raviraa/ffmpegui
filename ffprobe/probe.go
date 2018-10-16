@@ -11,7 +11,7 @@ import (
 // Prober has logic that changes based on platform
 type Prober interface {
 	getDevicesCmd() string
-	getFfmpegCmd() []string
+	getFfmpegCmd() ([]string, error)
 }
 
 // Devices has information about ffmpeg multimedia devices
@@ -38,7 +38,7 @@ type proberCommon struct {
 // Options configures ffmpeg encoding process
 type Options struct {
 	// Video_size string TODO
-	UIInputs []*UIInput
+	UIInputs []UIInput
 }
 
 var opts *Options
@@ -49,7 +49,7 @@ func init() {
 }
 
 // SetInputs to set configure input streams
-func SetInputs(uiips []*UIInput) {
+func SetInputs(uiips []UIInput) {
 	opts.UIInputs = uiips
 }
 
@@ -111,20 +111,30 @@ func parseFfmpegDeviceType(prober Prober, dtype string) []string {
 	return devs[dtypeKey]
 }
 
+// GetVersion returns ffmpeg version
 func GetVersion() string {
 	return "ffmpeg 1234.22" //TODO
 }
 
-func getCommand(prober Prober) (cmd []string) {
-	cmd = append(cmd, prober.getFfmpegCmd()...)
-	return cmd
+func getCommand(prober Prober) ([]string, error) {
+	return prober.getFfmpegCmd()
 }
 
 // StartEncode starts ffmpeg process with configured options
 // and returns stdout scanner
-func StartEncode(prober Prober) (*bufio.Scanner, error) {
+func StartEncode(prober Prober, startmux bool) (*bufio.Scanner, error) {
 	if !deviceCommon.started {
-		cmd := getCommand(prober)
+		var cmd []string
+		var err error
+		if startmux {
+			cmd, err = getMuxCommand(*opts)
+		} else {
+			cmd, err = getCommand(prober)
+		}
+		if err != nil {
+			log.Errorf("StartEncode failed" + err.Error())
+			return nil, err
+		}
 		scanner, err := deviceCommon.runCmdPipe(cmd)
 		if err == nil {
 			deviceCommon.started = true
