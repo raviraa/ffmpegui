@@ -31,26 +31,28 @@ type proberCommon struct {
 	devicesKey string
 	deviceKey  string //input device
 	done       chan bool
-	started    bool
 	Devices
 }
 
-// Options configures ffmpeg encoding process
-type Options struct {
-	// Video_size string TODO
-	UIInputs []UIInput
-}
+// Started indicates whether ffmpeg process is running
+var Started bool //TODO needs mutex?
 
 var opts *Options
 
 func init() {
 	opts = &Options{}
 	cfgname = "common_presets.toml"
+	uiOptsFname = "uiopts.toml"
 }
 
 // SetInputs to set configure input streams
 func SetInputs(uiips []UIInput) {
 	opts.UIInputs = uiips
+}
+
+// GetInputs gets
+func GetInputs() []UIInput {
+	return opts.UIInputs
 }
 
 var log *logging.Logger
@@ -123,10 +125,13 @@ func getCommand(prober Prober) ([]string, error) {
 // StartEncode starts ffmpeg process with configured options
 // and returns stdout scanner
 func StartEncode(prober Prober, startmux bool) (*bufio.Scanner, error) {
-	if !deviceCommon.started {
+	if !Started {
 		var cmd []string
 		var err error
 		if startmux {
+			if len(opts.UIInputs) <= 1 {
+				return nil, errors.New("Not muxing, not enough streams")
+			}
 			cmd, err = getMuxCommand(*opts)
 		} else {
 			cmd, err = getCommand(prober)
@@ -137,7 +142,7 @@ func StartEncode(prober Prober, startmux bool) (*bufio.Scanner, error) {
 		}
 		scanner, err := deviceCommon.runCmdPipe(cmd)
 		if err == nil {
-			deviceCommon.started = true
+			Started = true
 			return scanner, nil
 		}
 		log.Errorf("StartEncode failed" + err.Error())
@@ -149,11 +154,11 @@ func StartEncode(prober Prober, startmux bool) (*bufio.Scanner, error) {
 
 // StopEncode stop ffmpeg process
 func StopEncode() bool {
-	if deviceCommon.started {
+	if Started {
 		deviceCommon.done <- true //send done signal and..
 		<-deviceCommon.done       //wait for process done
 		log.Info("process stopped")
-		deviceCommon.started = false
+		Started = false
 		return true
 	}
 	log.Errorf("already stopped")
@@ -164,7 +169,7 @@ func StopEncode() bool {
 func NewProber() Prober {
 	var prober Prober = &macProber
 	GetFfmpegDevices(prober)
-	loadCommonConfig(configFile())
+	loadCommonConfig(configPath())
 	// Default config Options
 	return prober
 }

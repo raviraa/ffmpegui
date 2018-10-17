@@ -20,7 +20,7 @@ func runCmd(args []string, ignExitCode bool) (string, error) {
 	err := cmd.Run()
 	if err != nil && !ignExitCode {
 		fmt.Println(out.String())
-		panic(err)
+		return "", err
 	}
 	return out.String(), nil
 }
@@ -53,7 +53,7 @@ func (mp *proberCommon) runCmdPipe(cmdstr []string) (*bufio.Scanner, error) {
 		log.Info("Received stop signal. Sending quit")
 		defer stdin.Close()
 		cmd.Process.Signal(os.Interrupt)
-		// io.WriteString(stdin, "+") TODO send keys for status, pause
+		// cmd.Process.Signal(syscall.SIGSTOP)
 		cmd.Wait()
 		mp.done <- true //signal process done
 	}()

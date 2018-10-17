@@ -20,10 +20,12 @@ func onStopClicked(btn *ui.Button) {
 		} else {
 			lblDesc.SetText("ffmpeg mux start failed: " + err.Error())
 		}
-
 	}
 }
 
+func onPauseClicked(btn *ui.Button) {
+	panic("TODO ctrl z")
+}
 func onStartClicked(btn *ui.Button) {
 	var inpsar []ffprobe.UIInput
 	for _, i := range inps.ffinputs {
@@ -31,6 +33,8 @@ func onStartClicked(btn *ui.Button) {
 	}
 	log.Info(fmt.Sprintf("%#v", inpsar))
 	ffprobe.SetInputs(inpsar)
+	ffprobe.WriteUIOpts()
+	return
 	ffstderr, err := ffprobe.StartEncode(prober, false)
 	if err == nil {
 		ctrlStatus.Append("==============\n")
@@ -45,11 +49,13 @@ func readWritepipe(scanner *bufio.Scanner) {
 	go func() {
 		count := 0
 		scanner.Split(scanLines)
+		frmtxt := ""
 		for scanner.Scan() {
 			txt := scanner.Text()
 			if strings.Contains(txt, "frame=") {
 				if count%updateFrameCount == 0 {
 					ui.QueueMain(func() {
+						frmtxt = txt
 						lblDesc.SetText(txt)
 					})
 				}
@@ -60,8 +66,8 @@ func readWritepipe(scanner *bufio.Scanner) {
 				})
 			}
 		}
-		panic("todo")
-		// ffprobe.Started = false
+		ctrlStatus.Append(frmtxt + "\nDone.\n\n\n\n")
+		ffprobe.Started = false
 	}()
 }
 

@@ -22,6 +22,8 @@ func Test_Mac_getDevices(t *testing.T) {
 func Test_Mac_getCmd(t *testing.T) {
 	macprober := NewProber()
 	loadCommonConfig(cfgname)
+	opts.Framerate = 24
+	opts.Ffcmdprefix = "ffmpeg -benchmark -y -loglevel verbose"
 	SetInputs([]UIInput{UIInput{Type: Audio}})
 	defer func() { opts = &Options{} }()
 	want := "ffmpeg -benchmark -y -loglevel verbose -thread_queue_size 512 -framerate 24 -f avfoundation -i none:0 -map 0:v -c:v libx264 -framerate 24 -preset faster 0.mkv"
@@ -66,7 +68,7 @@ func Test_parseFfmpegDevices(t *testing.T) {
 
 func Test_StartProcessFail(t *testing.T) {
 	prober := NewProber()
-	config.Ffcmdprefix = "pytho"
+	opts.Ffcmdprefix = "pytho"
 	scanner, _ := StartEncode(prober, false)
 	if scanner != nil {
 		t.Errorf("expected process fail")
@@ -75,7 +77,7 @@ func Test_StartProcessFail(t *testing.T) {
 
 func Test_ProcessInterrupt(t *testing.T) {
 	prober := NewProber()
-	config.Ffcmdprefix = "sleep 10"
+	opts.Ffcmdprefix = "sleep 10"
 	tbeg := time.Now().UnixNano()
 	StartEncode(prober, false)
 	if !StopEncode() || (time.Now().UnixNano()-tbeg > 1e9) {
@@ -85,7 +87,7 @@ func Test_ProcessInterrupt(t *testing.T) {
 
 func Test_StartProcessOutput(t *testing.T) {
 	prober := NewProber()
-	config.Ffcmdprefix = "ls asdf1234"
+	opts.Ffcmdprefix = "ls asdf1234"
 	scanner, _ := StartEncode(prober, false)
 	var ffout string
 	done := make(chan bool)

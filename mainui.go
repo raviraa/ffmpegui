@@ -21,9 +21,15 @@ var (
 	updateFrameCount = 9 // update frame status every n ffmpeg updates
 )
 
-func addInput(idx int, typ ffprobe.Avtype) *ui.Group {
-	uiip := ffprobe.UIInput{Devidx: -1, Presetidx: -1, Type: typ}
-	inps.ffinputs = append(inps.ffinputs, &uiip)
+func addInput(idx int, typ ffprobe.Avtype, cnfuiip *ffprobe.UIInput) {
+	var uiip *ffprobe.UIInput
+	if cnfuiip == nil {
+		uiip = &ffprobe.UIInput{Devidx: -1, Presetidx: -1, Type: typ}
+	} else {
+		uiip = cnfuiip
+	}
+	inps.ffinputs = append(inps.ffinputs, uiip)
+	fmt.Println(uiip)
 	group := ui.NewGroup(fmt.Sprintf("Input %d", idx))
 	inps.inpbox.Append(group, false)
 	group.SetMargined(true)
@@ -50,6 +56,9 @@ func addInput(idx int, typ ffprobe.Avtype) *ui.Group {
 	cboxDevs.OnSelected(func(cb *ui.Combobox) {
 		uiip.Devidx = cb.Selected()
 	})
+	if uiip.Devidx != -1 {
+		cboxDevs.SetSelected(uiip.Devidx)
+	}
 	cboxPresets := ui.NewCombobox()
 	entryForm.Append("Presets", cboxPresets, false)
 	cboxPresets.OnSelected(func(cb *ui.Combobox) {
@@ -58,21 +67,22 @@ func addInput(idx int, typ ffprobe.Avtype) *ui.Group {
 	for _, s := range ffprobe.GetPresets() {
 		cboxPresets.Append(s)
 	}
+	if uiip.Presetidx != -1 {
+		cboxPresets.SetSelected(uiip.Presetidx)
+	}
 
-	btnfile := ui.NewButton("...")
-	entryForm.Append("Save As", btnfile, false)
-	btnfile.OnClicked(func(*ui.Button) {
-		filename := ui.SaveFile(mwin)
-		log.Info("selected file", filename)
-	})
+	btnfile := ui.NewButton("Remove")
+	entryForm.Append("", btnfile, false)
 
-	return group
 }
 
 func beginUIProbe() {
 	log.Info("Starting in GUI mode")
 	prober = ffprobe.NewProber()
 	lblDesc.SetText(ffprobe.GetVersion())
+	for idx, uiip := range ffprobe.GetInputs() {
+		addInput(idx, uiip.Type, &uiip)
+	}
 }
 
 func setupUI() {
@@ -98,13 +108,13 @@ func setupUI() {
 	btnaddbox.Append(btnaddinp, false)
 	btnaddinp.OnClicked(func(*ui.Button) {
 		inpidx := len(inps.ffinputs)
-		addInput(inpidx, ffprobe.Video)
+		addInput(inpidx, ffprobe.Video, nil)
 	})
 	btnaddaud := ui.NewButton("Add Audio")
 	btnaddbox.Append(btnaddaud, false)
 	btnaddaud.OnClicked(func(*ui.Button) {
 		inpidx := len(inps.ffinputs)
-		addInput(inpidx, ffprobe.Audio)
+		addInput(inpidx, ffprobe.Audio, nil)
 	})
 	inps = &inputControls{}
 	inps.inpbox = ui.NewHorizontalBox()
@@ -124,12 +134,17 @@ func setupUI() {
 	btnstart := ui.NewButton("Start")
 	btnhbox.Append(btnstart, false)
 	btnstart.OnClicked(onStartClicked)
+	btnpause := ui.NewButton("Pause/Resume")
+	btnhbox.Append(btnpause, false)
+	btnpause.OnClicked(onPauseClicked)
 	btnstop := ui.NewButton("Stop")
 	btnstop.OnClicked(onStopClicked)
 	btnhbox.Append(btnstop, false)
 
 	mwin.Show()
-	go beginUIProbe()
+	ui.QueueMain(func() {
+		beginUIProbe()
+	})
 }
 func mainUI() {
 	if err := ui.Main(setupUI); err != nil {

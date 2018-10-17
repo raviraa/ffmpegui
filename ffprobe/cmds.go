@@ -25,7 +25,7 @@ func presetCmd(presetName string, avidx int) ([]string, error) {
 	s = append(s, "-map", fmt.Sprintf("%d:%s", avidx, avtype))
 	s = append(s, fmt.Sprintf("-c:%s", avtype), codec.(string))
 	if avtype == "v" {
-		s = append(s, "-framerate", fmt.Sprintf("%v", config.Framerate))
+		s = append(s, "-framerate", fmt.Sprintf("%v", opts.Framerate))
 	}
 	for k, v := range prset {
 		if k == "fileext" || k == "type" || k == "codec" {
@@ -47,7 +47,7 @@ func inputCmd(pltip map[string]*input, uiip UIInput) ([]string, error) {
 		return nil, fmt.Errorf("unknown platform device type " + avtype)
 	}
 	s = append(s, mapToString(config.InputsDefaults)...)
-	s = append(s, "-framerate", fmt.Sprintf("%v", config.Framerate))
+	s = append(s, "-framerate", fmt.Sprintf("%v", opts.Framerate))
 	ipmap := make(map[string]interface{})
 	for k, v := range structs.Map(ip) {
 		if k != "I" && k != "F" {
@@ -62,7 +62,7 @@ func inputCmd(pltip map[string]*input, uiip UIInput) ([]string, error) {
 
 func getConfCmd(plt string, opts Options) ([]string, error) {
 	var s []string
-	s = append(s, strings.Split(config.Ffcmdprefix, " ")...)
+	s = append(s, strings.Split(opts.Ffcmdprefix, " ")...)
 	for avidx, uiip := range opts.UIInputs {
 		ipcmd, err := inputCmd(config.Inputs[plt], uiip)
 		if err != nil {
@@ -88,7 +88,7 @@ func getConfCmd(plt string, opts Options) ([]string, error) {
 func getMuxCommand(opts Options) ([]string, error) {
 	var s []string
 	var fileext string
-	s = append(s, strings.Split(config.Ffcmdprefix, " ")...)
+	s = append(s, strings.Split(opts.Ffcmdprefix, " ")...)
 	for avidx, uiip := range opts.UIInputs {
 		psidx, err := getPresetByIdx(uiip.Presetidx)
 		if err != nil {
@@ -104,6 +104,10 @@ func getMuxCommand(opts Options) ([]string, error) {
 		if ps["type"] == "v" || fileext == "" {
 			fileext = ps["fileext"].(string)
 		}
+	}
+	for avidx, uiip := range opts.UIInputs {
+		psidx, _ := getPresetByIdx(uiip.Presetidx)
+		ps, _ := config.Presets[psidx]
 		//-map 0:v
 		s = append(s, "-map", fmt.Sprintf("%d:%s", avidx, ps["type"]))
 	}
