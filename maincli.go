@@ -1,16 +1,12 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"strings"
-	"time"
-
 	"github.com/raviraa/ffmpegui/ffprobe"
 )
 
 var log = ffprobe.SetLogger()
 
+/*
 func beginCli() {
 	// log.Info("Starting in CLI")
 	prober := ffprobe.NewProber()
@@ -42,3 +38,5 @@ func mainCli() {
 
 	beginCli()
 }
+
+*/

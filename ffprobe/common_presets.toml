@@ -1,6 +1,4 @@
-
-ffcmdprefix = 'ffmpeg -benchmark -y -loglevel verbose'
-framerate = 24.0
+Ffcmdprefix = "ffmpeg -benchmark -y -loglevel verbose -hide_banner"
 
 [inputs_defaults]
 thread_queue_size = 512
@@ -15,51 +13,61 @@ f = 'avfoundation'
 i = 'none:%d'
 
 
-#  -map 1:v -c:v vp9 -s 1920x1080 -framerate 25  -benchmark -speed 5 -tile-columns 6 -frame-parallel 1 -threads 8 -static-thresh 0 -max-intra-rate 300 -deadline realtime  -crf 9 -lag-in-frames 9 -row-mt 1 -error-resilient 1
-
 [presets]
 
 [presets.opus-default]
 fileext = 'opus'
-type = 'a'
+avtype = 'a'
 codec = 'libopus'
 
 [presets.vp9-default]
 fileext = "webm"
-type = "v"
+avtype = "v"
 codec = "vp9"
+[presets.vp9-default.options]
+threads = 8
+[presets.h264-default]
+fileext = "mkv"
+avtype = "v"
+codec = "libx264"
 
 [presets.opus-voice]
 fileext = 'opus'
-type = 'a'
+avtype = 'a'
 codec = 'libopus'
+[presets.opus-voice.options]
 "b:a" = '32k'
 application = 'voip'
 af = "highpass=f=200, lowpass=f=1000"
 
 
-[presets.h264-realtime]
+# [presets.vp9-realtime]
+# pix_fmt='yuv420p' # TODO output defaults
+# fileext = "webm"
+# avtype = "v"
+# codec = "vp9"
+# [presets.vp9-realtime.options]
+# speed=5
+# tile-columns=6
+# frame-parallel=1
+# threads=8
+# static-thresh=0
+# max-intra-rate=300
+# deadline="realtime"
+# crf=9
+# lag-in-frames=9
+# # TODO quality min max
+# row-mt=1
+# error-resilient=1
+
+[presets.capture-v]
 fileext = "mkv"
-type = "v"
+avtype = "v"
 codec = "libx264"
-preset = "faster"  # ultrafast superfast veryfast faster fast medium – default preset slow slower veryslow placebo
-
-[presets.vp9-realtime]
-pix_fmt='yuv420p' # TODO output defaults
-fileext = "webm"
-type = "v"
-codec = "vp9"
-speed=5
-tile-columns=6
-frame-parallel=1
-threads=8
-static-thresh=0
-max-intra-rate=300
-deadline="realtime"
-crf=9
-lag-in-frames=9
-# TODO quality min max
-row-mt=1
-error-resilient=1
-
-
+[presets.capture-v.options]
+preset = "ultrafast"
+crf = 0
+[presets.capture-a]
+fileext = 'aac'
+avtype = 'a'
+codec = 'aac'

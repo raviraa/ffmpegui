@@ -16,19 +16,20 @@ var (
 	lblDesc          *ui.Label
 	ctrlStatus       *ui.MultilineEntry
 	mwin             *ui.Window
+	btnpause         *ui.Button
 	inps             *inputControls
 	prober           ffprobe.Prober
 	updateFrameCount = 9 // update frame status every n ffmpeg updates
 )
 
 func addInput(idx int, typ ffprobe.Avtype, cnfuiip *ffprobe.UIInput) {
-	var uiip *ffprobe.UIInput
+	var uiip ffprobe.UIInput
 	if cnfuiip == nil {
-		uiip = &ffprobe.UIInput{Devidx: -1, Presetidx: -1, Type: typ}
+		uiip = ffprobe.UIInput{Devidx: -1, Presetidx: -1, Type: typ} //TODO use newInput and move ffinputs to ffprobe
 	} else {
-		uiip = cnfuiip
+		// uiip = cnfuiip
 	}
-	inps.ffinputs = append(inps.ffinputs, uiip)
+	inps.ffinputs = append(inps.ffinputs, &uiip)
 	fmt.Println(uiip)
 	group := ui.NewGroup(fmt.Sprintf("Input %d", idx))
 	inps.inpbox.Append(group, false)
@@ -64,7 +65,7 @@ func addInput(idx int, typ ffprobe.Avtype, cnfuiip *ffprobe.UIInput) {
 	cboxPresets.OnSelected(func(cb *ui.Combobox) {
 		uiip.Presetidx = cb.Selected()
 	})
-	for _, s := range ffprobe.GetPresets() {
+	for _, s := range ffprobe.GetPresets(uiip.Type) {
 		cboxPresets.Append(s)
 	}
 	if uiip.Presetidx != -1 {
@@ -80,9 +81,10 @@ func beginUIProbe() {
 	log.Info("Starting in GUI mode")
 	prober = ffprobe.NewProber()
 	lblDesc.SetText(ffprobe.GetVersion())
-	for idx, uiip := range ffprobe.GetInputs() {
-		addInput(idx, uiip.Type, &uiip)
-	}
+	startFfoutReader()
+	// for idx, uiip := range ffprobe.GetInputs() {
+	// 	addInput(idx, uiip.Type, &uiip)
+	// }
 }
 
 func setupUI() {
@@ -134,7 +136,7 @@ func setupUI() {
 	btnstart := ui.NewButton("Start")
 	btnhbox.Append(btnstart, false)
 	btnstart.OnClicked(onStartClicked)
-	btnpause := ui.NewButton("Pause/Resume")
+	btnpause = ui.NewButton("Pause")
 	btnhbox.Append(btnpause, false)
 	btnpause.OnClicked(onPauseClicked)
 	btnstop := ui.NewButton("Stop")
@@ -146,6 +148,7 @@ func setupUI() {
 		beginUIProbe()
 	})
 }
+
 func mainUI() {
 	if err := ui.Main(setupUI); err != nil {
 		log.Panic(err)
@@ -156,4 +159,16 @@ func mainUI() {
 func main() {
 	// mainCli()
 	mainUI()
+}
+
+func setStatus(s string) {
+	ui.QueueMain(func() {
+		lblDesc.SetText(s)
+	})
+}
+
+func addInfo(s string) {
+	ui.QueueMain(func() {
+		ctrlStatus.Append(s)
+	})
 }

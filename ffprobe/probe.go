@@ -1,8 +1,8 @@
 package ffprobe
 
 import (
-	"bufio"
 	"errors"
+	"runtime"
 	"strings"
 
 	logging "github.com/op/go-logging"
@@ -31,13 +31,14 @@ type proberCommon struct {
 	devicesKey string
 	deviceKey  string //input device
 	done       chan bool
+	opts       *Options
 	Devices
 }
 
 // Started indicates whether ffmpeg process is running
 var Started bool //TODO needs mutex?
 
-var opts *Options
+var opts *Options // TODO move to devcommon
 
 func init() {
 	opts = &Options{}
@@ -46,8 +47,9 @@ func init() {
 }
 
 // SetInputs to set configure input streams
-func SetInputs(uiips []UIInput) {
+func SetInputs(uiips []UIInput, resumeCount int) {
 	opts.UIInputs = uiips
+	config.resumeCount = resumeCount
 }
 
 // GetInputs gets
@@ -63,9 +65,9 @@ func SetLogger() *logging.Logger {
 	return log
 }
 
+// TODO move to NewProber
 var deviceCommon = proberCommon{
-	deviceKey: "input device",
-	// TODO: -s scale, resolution input oputpu
+	deviceKey:  "input device",
 	devicesKey: "devices:",
 	done:       make(chan bool),
 }
@@ -122,34 +124,53 @@ func getCommand(prober Prober) ([]string, error) {
 	return prober.getFfmpegCmd()
 }
 
+// StartMux concats all resume split streams,
+// and avstreams to final container
+func StartMux(prober Prober) error {
+	// TODO start stop status
+	for avidx := range opts.UIInputs {
+		cmd, err := getConcatCmd(*opts, avidx)
+		if err != nil {
+			return err
+		}
+		if err = deviceCommon.runCmdPipe(cmd, true); err != nil {
+			return err
+		}
+	}
+	cmd, err := getMuxCommand(*opts)
+	if err != nil {
+		return err
+	}
+	if err = deviceCommon.runCmdPipe(cmd, true); err != nil {
+		return err
+	}
+	return nil
+}
+
 // StartEncode starts ffmpeg process with configured options
 // and returns stdout scanner
-func StartEncode(prober Prober, startmux bool) (*bufio.Scanner, error) {
+func StartEncode(prober Prober, startmux bool) error {
 	if !Started {
 		var cmd []string
 		var err error
 		if startmux {
-			if len(opts.UIInputs) <= 1 {
-				return nil, errors.New("Not muxing, not enough streams")
-			}
 			cmd, err = getMuxCommand(*opts)
 		} else {
 			cmd, err = getCommand(prober)
 		}
 		if err != nil {
 			log.Errorf("StartEncode failed" + err.Error())
-			return nil, err
+			return err
 		}
-		scanner, err := deviceCommon.runCmdPipe(cmd)
-		if err == nil {
+		if err = deviceCommon.runCmdPipe(cmd, false); err == nil {
 			Started = true
-			return scanner, nil
+			return nil
 		}
 		log.Errorf("StartEncode failed" + err.Error())
-		return nil, err
+		return err
 	}
 	log.Errorf("already started")
-	return nil, errors.New("already started")
+	return errors.New("already started")
 }
 
 // StopEncode stop ffmpeg process
@@ -157,7 +178,6 @@ func StopEncode() bool {
 	if Started {
 		deviceCommon.done <- true //send done signal and..
 		<-deviceCommon.done       //wait for process done
-		log.Info("process stopped")
 		Started = false
 		return true
 	}
@@ -167,9 +187,17 @@ func StopEncode() bool {
 
 // NewProber returns prober for correct platform
 func NewProber() Prober {
-	var prober Prober = &macProber
+	var prober Prober
+	switch runtime.GOOS {
+	case "darwin":
+		prober = &macProber
+	default:
+		panic("OS not supported")
+	}
+	deviceCommon.opts = opts
+	Ffoutchan = make(chan Ffoutmsg)
+	deviceCommon.probeDefaults()
 	GetFfmpegDevices(prober)
 	loadCommonConfig(configPath())
-	// Default config Options
 	return prober
 }

@@ -15,5 +15,5 @@ func (pm *proberMac) getDevicesCmd() string {
 }
 
 func (pm *proberMac) getFfmpegCmd() ([]string, error) {
-	return getConfCmd("mac", *opts)
+	return getRecCmd("mac", *opts)
 }

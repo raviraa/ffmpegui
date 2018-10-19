@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 )
 
 func runCmd(args []string, ignExitCode bool) (string, error) {
@@ -31,32 +32,93 @@ func runCmdStr(cmd string, ignExitCode bool) string {
 	return ""
 }
 
-func (mp *proberCommon) runCmdPipe(cmdstr []string) (*bufio.Scanner, error) {
+func (mp *proberCommon) runCmdPipe(cmdstr []string, wait bool) error {
 	log.Info(cmdstr)
 	cmd := exec.Command(cmdstr[0], cmdstr[1:]...)
 	// cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	stdout, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	outscanner := bufio.NewScanner(stdout)
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return err
 	}
 	go func() {
-		<-mp.done
-		log.Info("Received stop signal. Sending quit")
 		defer stdin.Close()
-		cmd.Process.Signal(os.Interrupt)
-		// cmd.Process.Signal(syscall.SIGSTOP)
+		if wait {
+			return
+		}
+		<-mp.done
+		log.Infof("Received signal. Sending SIGINT...")
+		cmd.Process.Signal(syscall.SIGINT)
 		cmd.Wait()
-		mp.done <- true //signal process done
+		//indicate signal sent, SIGUSR1 value is ignored
+		mp.done <- true
+		log.Info("ffmpeg stopped. ", err)
 	}()
 
-	return outscanner, nil
+	readWritepipe(outscanner)
+	if wait {
+		err := cmd.Wait()
+		log.Info("ffmpeg stopped. ", err)
+	}
+	return nil
+}
+
+// Ffoutmsg ffmpeg output line
+type Ffoutmsg struct {
+	FrameUpdate bool
+	Msg         string
+}
+
+// Ffoutchan output lines from ffmpeg process
+var Ffoutchan chan Ffoutmsg
+
+func readWritepipe(scanner *bufio.Scanner) {
+	go func() {
+		count := 0
+		scanner.Split(scanLines)
+		frmtxt := ""
+		for scanner.Scan() {
+			txt := scanner.Text()
+			if strings.Contains(txt, "frame=") {
+				if count%3 == 0 {
+					frmtxt = txt
+					// setStatus(txt)
+					Ffoutchan <- Ffoutmsg{true, txt}
+				}
+				count++
+			} else {
+				// addInfo(txt + "\n")
+				Ffoutchan <- Ffoutmsg{false, txt + "\n"}
+			}
+		}
+		Ffoutchan <- Ffoutmsg{false, frmtxt + "\nDone.\n\n\n\n"}
+		Started = false
+	}()
+}
+
+// scanLines splits into lines for either \r or \n
+func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.IndexByte(data, '\r'); i >= 0 {
+		return i + 1, data[0:i], nil
+	}
+	if i := bytes.IndexByte(data, '\n'); i >= 0 {
+		return i + 1, data[0:i], nil
+	}
+	// If we're at EOF, we have a final, non-terminated line. Return it.
+	if atEOF {
+		return len(data), data, nil
+	}
+	// Request more data.
+	return 0, nil, nil
 }

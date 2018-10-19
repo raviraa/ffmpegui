@@ -1,13 +1,10 @@
 package ffprobe
 
 import (
-	"bytes"
 	"errors"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/BurntSushi/toml"
 )
 
 func TestConfInputs(t *testing.T) {
@@ -54,8 +51,9 @@ func TestContainer(t *testing.T) {
 		want  string
 	}{
 		{"vp9-default", 0, nil, "-map 0:v -c:v vp9"},
-		{"vp9-default", 0, nil, " 0.webm"},
-		{"opus-default", 0, nil, "-map 0:a -c:a libopus 0.opus"},
+		{"vp9-default", 0, nil, " 0_0.webm"},
+		{"vp9-default", 0, nil, "-threads 8"},
+		{"opus-default", 0, nil, "-map 0:a -c:a libopus 0_0.opus"},
 		{"wrongpreset", 1, errors.New("unknown preset wrongpreset"), ""},
 	}
 	for _, tt := range tests {
@@ -67,10 +65,47 @@ func TestContainer(t *testing.T) {
 	}
 }
 
-func TestGetConfCmd(t *testing.T) {
+func testInputs(ps ...string) []UIInput {
+	var ips []UIInput
+	for _, p := range ps {
+		ips = append(ips, config.newInput(p))
+	}
+	return ips
+}
+
+type td struct {
+	fname string
+	want  string
+}
+
+func testOptions() map[*Options][]td {
+	return map[*Options][]td{
+		&Options{UIInputs: testInputs("opus-default")}: []td{
+			{"getRecCmd", "-map 0:a -c:a aac"},
+			{"getMuxCommand", "-i 0.opus -map 0:a -c copy 20"},
+			{"getConcatCmd", "-i 0_0.aac -i 1_0.aac"},
+			{"getConcatCmd", "libopus 0.opus"},
+		},
+		&Options{UIInputs: testInputs("vp9-default")}: []td{
+			{"getRecCmd", "-c:v libx264"},
+			{"getRecCmd", "-crf 0"},
+			{"getMuxCommand", "-i 0.webm -map 0:v -c copy "},
+			{"getConcatCmd", "[0:v:0][1:v:0]concat=n=2:v=1[out]"},
+		},
+		&Options{UIInputs: testInputs("opus-default", "vp9-default")}: []td{
+			{"getRecCmd", "-c:a aac 1_0.aac"},
+			{"getRecCmd", "1_1.mkv"},
+			{"getMuxCommand", "-i 0.opus -i 1.webm -map 0:a -map 1:v -c copy "},
+			{"getConcatCmd", "libopus 0.opus"},
+		},
+	}
+}
+
+func TestCmds(t *testing.T) {
 	loadCommonConfig(cfgname)
-	tests := []struct {
-		plt  string
+	opts := testOptions()
+	/* := []struct {
+		plt string
 		opts *Options
 		want string
 	}{
@@ -80,64 +115,28 @@ func TestGetConfCmd(t *testing.T) {
 			"-f avfoundation -i 0:none -map 0:v -c:v vp9"},
 		{"mac", &Options{UIInputs: []UIInput{UIInput{Type: Audio, Presetidx: 2}, UIInput{Type: Video, Presetidx: 3}}},
 			"-f avfoundation -i 0:none -map 1:v -c:v vp9"},
-	}
-	for _, tt := range tests {
-		cmds, _ := getConfCmd(tt.plt, *tt.opts)
-		if got := strings.Join(cmds, " "); !strings.Contains(got, tt.want) {
-			t.Errorf("conf input got %#v, should contain %#v", got, tt.want)
-		}
-	}
-}
-
-func TestGetMuxCommand(t *testing.T) {
-	loadCommonConfig(cfgname)
-	tests := []struct {
-		opts Options
-		want string
-	}{
-		{Options{UIInputs: []UIInput{UIInput{Type: Audio, Presetidx: 1}}},
-			"-i 0.opus -map 0:a -c copy 20"},
-		{Options{UIInputs: []UIInput{UIInput{Type: Video, Presetidx: 3}}},
-			"-i 0.webm -map 0:v -c copy "},
-		{Options{UIInputs: []UIInput{UIInput{Type: Audio, Presetidx: 2}, UIInput{Type: Video, Presetidx: 3}}},
-			"-i 0.opus -i 1.webm -map 0:a -map 1:v -c copy "},
-	}
-	for _, tt := range tests {
-		cmds, _ := getMuxCommand(tt.opts)
-		if got := strings.Join(cmds, " "); !strings.Contains(got, tt.want) {
-			t.Errorf("conf input got %#v, should contain %#v", got, tt.want)
-		}
-	}
-}
-
-func encodeExpected(
-	t *testing.T, label string, val interface{}, wantStr string,
-) {
-	var buf bytes.Buffer
-	enc := toml.NewEncoder(&buf)
-	err := enc.Encode(val)
-	if err != nil {
-		t.Errorf("encode failed: %v", err)
-	}
-	if got := buf.String(); !strings.Contains(got, wantStr) {
-		t.Errorf("%s: should contain\n-----\n%q\n-----\nbut got\n-----\n%q\n-----\n",
-			label, wantStr, got)
-	}
-}
-
-func TestUIInputEncode(t *testing.T) {
-	tests := []struct {
-		opts Options
-		want []string
-	}{
-		{Options{Framerate: 24.0, UIInputs: []UIInput{UIInput{Type: Audio, Presetidx: 1}}},
-			[]string{"[[UIInputs]]\n  Devidx = 0\n  Presetidx = 1\n  Type = 1\n", "Framerate = 24.0"}},
-		{Options{UIInputs: []UIInput{UIInput{Type: Video, Presetidx: 3}}},
-			[]string{"[[UIInputs]]\n  Devidx = 0\n  Presetidx = 3\n  Type = 0\n"}},
-	}
-	for _, tt := range tests {
-		for _, want := range tt.want {
-			encodeExpected(t, "encode UIInput", tt.opts, want)
+	}*/
+	for opt, tt := range opts {
+		for _, d := range tt {
+			t.Run(d.fname, func(t *testing.T) {
+				var cmds []string
+				var err error
+				switch d.fname {
+				case "getRecCmd":
+					cmds, err = getRecCmd("mac", *opt)
+				case "getMuxCommand":
+					cmds, err = getMuxCommand(*opt)
+				case "getConcatCmd":
+					config.resumeCount = 1
+					cmds, err = getConcatCmd(*opt, 0)
+				}
+				if err != nil {
+					t.Error(err)
+				}
+				if got := strings.Join(cmds, " "); !strings.Contains(got, d.want) {
+					t.Errorf("%s(%v) got %#v, should contain %#v", d.fname, *opt, got, d.want)
+				}
+			})
 		}
 	}
 }

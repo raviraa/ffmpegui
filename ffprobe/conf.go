@@ -12,9 +12,6 @@ import (
 	"github.com/shibukawa/configdir"
 )
 
-//go:generate go get -u github.com/jteeuwen/go-bindata/...
-//go:generate go-bindata -pkg $GOPACKAGE -o assets.go -prefix assets/ assets/
-
 var config *tomlConfig
 
 // Avtype is audio video type for streams
@@ -29,11 +26,11 @@ const (
 
 type tomlConfig struct {
 	Inputs         map[string]map[string]*input
-	Presets        map[string]map[string]interface{}
+	Presets        map[string]preset
 	InputsDefaults map[string]interface{} `toml:"inputs_defaults"`
 	Containers     map[string][]string
-	// Ffcmdprefix    string
-	// Framerate float64
+	resumeCount    int
+	Ffcmdprefix    string
 }
 
 // UIInput has config from ui for each input stream
@@ -44,11 +41,18 @@ type UIInput struct {
 	// Video_size string TODO
 }
 
-// Options configures ffmpeg encoding process
+type preset struct {
+	Fileext string
+	Avtype  string //TODO string change to Avtype
+	Codec   string
+	Options map[string]interface{}
+}
+
+// Options for ffmpeg, saved/restored on encode start from WriteUIOpts()
 type Options struct {
-	UIInputs    []UIInput
-	Ffcmdprefix string
-	Framerate   float64
+	UIInputs  []UIInput
+	Framerate float64
+	VidPath   string
 }
 
 // input config for platform capture device
@@ -57,25 +61,58 @@ type input struct {
 	F string
 }
 
-func avtypestr(typ Avtype) string {
+func strType(typ string) Avtype {
+	if typ == "a" {
+		return Audio
+	}
+	return Video
+}
+func (typ Avtype) str() string {
 	if typ == Audio {
 		return "a"
 	}
 	return "v"
 }
 
-// GetPresets returns available presets
-func GetPresets() (cts []string) {
-	for k := range config.Presets {
-		cts = append(cts, k)
+func (c *tomlConfig) mkFile(fext string, fparts ...interface{}) string {
+	var s string
+	for i, p := range fparts {
+		if i != 0 {
+			s += "_"
+		}
+		s += fmt.Sprintf("%v", p)
 	}
-	sort.Strings(cts)
-	fmt.Println(cts)
+	s += "." + fext
+	return s
+}
+
+func (c *tomlConfig) newInput(pset string) UIInput {
+	ip := UIInput{Devidx: -1}
+	p, ok := c.Presets[pset]
+	if ok {
+		ip.Type = strType(p.Avtype)
+		for i, v := range GetPresets(ip.Type) {
+			if v == pset {
+				ip.Presetidx = i
+			}
+		}
+	}
+	return ip
+}
+
+// GetPresets returns available presets
+func GetPresets(typ Avtype) (ps []string) {
+	for k, p := range config.Presets {
+		if p.Avtype == typ.str() {
+			ps = append(ps, k)
+		}
+	}
+	sort.Strings(ps)
 	return
 }
 
-func getPresetByIdx(cidx int) (string, error) {
-	ps := GetPresets()
+func getPresetByIdx(cidx int, typ Avtype) (string, error) {
+	ps := GetPresets(typ)
 	if cidx >= len(ps) || cidx < 0 {
 		return "", errors.New("invalid preset")
 	}
@@ -139,6 +176,8 @@ func WriteUIOpts() error {
 	return nil
 }
 
+//go:generate go get -u github.com/jteeuwen/go-bindata/...
+//go:generate go-bindata -pkg $GOPACKAGE -o assets.go -prefix assets/ assets/
 func readUIOpts() error {
 	_, err := toml.DecodeFile(filepath.Join(configDir().Path, uiOptsFname), opts)
 	if err != nil {

@@ -8,40 +8,37 @@ import (
 	"github.com/fatih/structs"
 )
 
-func presetCmd(presetName string, avidx int) ([]string, error) {
+func presetOpts(presetName string, avidx int) ([]string, *preset, error) {
 	var s []string
-	prset, ok := config.Presets[presetName]
+	p, ok := config.Presets[presetName]
 	if !ok {
-		return nil, fmt.Errorf("unknown preset %s", presetName)
+		return nil, nil, fmt.Errorf("unknown preset %s", presetName)
 	}
-	fileext, ok1 := prset["fileext"]
-	avtype, ok2 := prset["type"]
-	codec, ok3 := prset["codec"]
-	if !ok1 || !ok2 || !ok3 {
-		return nil, fmt.Errorf("fileext, codec or type missing for " + presetName)
-	}
-
-	//  -map 0:a  -c:a libopus ... fname.opus
-	s = append(s, "-map", fmt.Sprintf("%d:%s", avidx, avtype))
-	s = append(s, fmt.Sprintf("-c:%s", avtype), codec.(string))
-	if avtype == "v" {
-		s = append(s, "-framerate", fmt.Sprintf("%v", opts.Framerate))
-	}
-	for k, v := range prset {
-		if k == "fileext" || k == "type" || k == "codec" {
-			continue
-		}
+	s = append(s, fmt.Sprintf("-c:%s", p.Avtype), p.Codec)
+	for k, v := range p.Options {
 		s = append(s, "-"+k)
 		s = append(s, fmt.Sprintf("%v", v))
 	}
-	s = append(s, fmt.Sprintf("%d.%s", avidx, fileext))
+	return s, &p, nil
+}
 
+func presetCmd(presetName string, avidx int) ([]string, error) {
+	var s []string
+	sopts, p, err := presetOpts(presetName, avidx)
+	if err != nil {
+		return nil, err
+	}
+
+	//  -map 0:a  -c:a libopus ... fname.opus
+	s = append(s, "-map", fmt.Sprintf("%d:%s", avidx, p.Avtype))
+	s = append(s, sopts...)
+	s = append(s, config.mkFile(p.Fileext, config.resumeCount, avidx))
 	return s, nil
 }
 
 func inputCmd(pltip map[string]*input, uiip UIInput) ([]string, error) {
 	var s []string
-	avtype := avtypestr(uiip.Type)
+	avtype := uiip.Type.str()
 	ip, ok := pltip[avtype]
 	if !ok {
 		return nil, fmt.Errorf("unknown platform device type " + avtype)
@@ -60,19 +57,16 @@ func inputCmd(pltip map[string]*input, uiip UIInput) ([]string, error) {
 	return s, nil
 }
 
-func getConfCmd(plt string, opts Options) ([]string, error) {
+// recording from capture devices, always uses capture-a or capture-v preset
+func getRecCmd(plt string, opts Options) ([]string, error) {
 	var s []string
-	s = append(s, strings.Split(opts.Ffcmdprefix, " ")...)
+	s = append(s, strings.Split(config.Ffcmdprefix, " ")...)
 	for avidx, uiip := range opts.UIInputs {
 		ipcmd, err := inputCmd(config.Inputs[plt], uiip)
 		if err != nil {
 			return nil, err
 		}
-		psidx, err := getPresetByIdx(uiip.Presetidx)
-		if err != nil {
-			return nil, err
-		}
-		pc, err := presetCmd(psidx, avidx)
+		pc, err := presetCmd(capturePreset(&uiip), avidx)
 		if err != nil {
 			return nil, err
 		}
@@ -84,38 +78,90 @@ func getConfCmd(plt string, opts Options) ([]string, error) {
 	return s, nil
 }
 
+func getConcatCmd(opts Options, avidx int) ([]string, error) {
+	var s []string
+	s = append(s, strings.Split(config.Ffcmdprefix, " ")...)
+	uiip := opts.UIInputs[avidx]
+	typ, ext, err := ctnrInfo(uiip, true)
+	if err != nil {
+		return nil, err
+	}
+	var filter string
+	for i := 0; i <= config.resumeCount; i++ {
+		s = append(s, "-i")
+		s = append(s, config.mkFile(ext, i, avidx))
+		filter += fmt.Sprintf("[%d:%s:0]", i, typ)
+	}
+	streams := "v=1:a=0"
+	if typ == "a" {
+		streams = "v=0:a=1"
+	}
+
+	s = append(s, "-filter_complex", filter+
+		fmt.Sprintf("concat=n=%d:%s[out]", config.resumeCount+1, streams))
+	s = append(s, "-map", "[out]")
+	psidx, err := getPresetByIdx(uiip.Presetidx, uiip.Type)
+	if err != nil {
+		return nil, err
+	}
+	pccmd, pc, err := presetOpts(psidx, avidx)
+	if err != nil {
+		return nil, err
+	}
+	s = append(s, pccmd...)
+	s = append(s, config.mkFile(pc.Fileext, avidx))
+	return s, nil
+}
+
 // -i 0.webm  -i 1.webm -map 0:v -map 1:a -c copy  200601021504.webm
 func getMuxCommand(opts Options) ([]string, error) {
 	var s []string
 	var fileext string
-	s = append(s, strings.Split(opts.Ffcmdprefix, " ")...)
+	s = append(s, strings.Split(config.Ffcmdprefix, " ")...)
 	for avidx, uiip := range opts.UIInputs {
-		psidx, err := getPresetByIdx(uiip.Presetidx)
+		// -i 1.webm
+		typ, ext, err := ctnrInfo(uiip, false)
 		if err != nil {
 			return nil, err
 		}
-		ps, ok := config.Presets[psidx]
-		if !ok {
-			return nil, fmt.Errorf("wrong preset index %v", psidx)
-		}
-		fname := fmt.Sprintf("%v.%v", avidx, ps["fileext"])
-		// -i 1.webm
+		fname := fmt.Sprintf("%v.%v", avidx, ext)
 		s = append(s, "-i", fname)
-		if ps["type"] == "v" || fileext == "" {
-			fileext = ps["fileext"].(string)
+		if typ == "v" || fileext == "" {
+			fileext = ext
 		}
 	}
 	for avidx, uiip := range opts.UIInputs {
-		psidx, _ := getPresetByIdx(uiip.Presetidx)
-		ps, _ := config.Presets[psidx]
+		typ, _, _ := ctnrInfo(uiip, false)
 		//-map 0:v
-		s = append(s, "-map", fmt.Sprintf("%d:%s", avidx, ps["type"]))
+		s = append(s, "-map", fmt.Sprintf("%d:%s", avidx, typ))
 	}
 	// -c copy
 	s = append(s, "-c", "copy")
 
-	tnow := time.Now()
-	s = append(s, fmt.Sprintf("%s.%s", tnow.Format("200601021504"), fileext))
+	tnow := time.Now().Format("200601021504")
+	s = append(s, config.mkFile(fileext, tnow))
 
 	return s, nil
+}
+
+func ctnrInfo(uiip UIInput, capture bool) (typ string, ext string, err error) {
+	var p preset
+	var ok bool
+	if capture {
+		p, ok = config.Presets[capturePreset(&uiip)]
+	} else {
+		psidx, err := getPresetByIdx(uiip.Presetidx, uiip.Type)
+		if err != nil {
+			return "", "", err
+		}
+		p, ok = config.Presets[psidx]
+	}
+	if !ok {
+		return "", "", fmt.Errorf("unknown preset")
+	}
+	return p.Avtype, p.Fileext, nil
+}
+
+func capturePreset(i *UIInput) string {
+	return "capture-" + i.Type.str()
 }

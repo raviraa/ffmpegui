@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/andlabs/ui"
 	"github.com/raviraa/ffmpegui/ffprobe"
@@ -13,79 +10,66 @@ import (
 func onStopClicked(btn *ui.Button) {
 	stopped := ffprobe.StopEncode() //TODO enable/disable start/stop buttons
 	if stopped {
-		ffstderr, err := ffprobe.StartEncode(prober, true)
+		// err := ffprobe.StartEncode(prober, true)
+		err := ffprobe.StartMux(prober)
 		if err == nil {
 			ctrlStatus.Append("==============\nMuxing streams\n")
-			readWritepipe(ffstderr)
 		} else {
 			lblDesc.SetText("ffmpeg mux start failed: " + err.Error())
 		}
 	}
 }
 
+var paused bool
+var resumeCount int
+
 func onPauseClicked(btn *ui.Button) {
-	panic("TODO ctrl z")
+	if paused {
+		// resume logic
+		resumeCount++
+		onStartClicked(btn)
+		paused = false
+		btnpause.SetText("Pause")
+	} else {
+		if ffprobe.StopEncode() {
+			paused = true
+			btnpause.SetText("Resume")
+		}
+	}
 }
+
 func onStartClicked(btn *ui.Button) {
+	if len(inps.ffinputs) == 0 {
+		lblDesc.SetText("No input streams to start")
+		return
+	}
+
 	var inpsar []ffprobe.UIInput
 	for _, i := range inps.ffinputs {
 		inpsar = append(inpsar, *i)
 	}
 	log.Info(fmt.Sprintf("%#v", inpsar))
-	ffprobe.SetInputs(inpsar)
+	ffprobe.SetInputs(inpsar, resumeCount)
 	ffprobe.WriteUIOpts()
-	return
-	ffstderr, err := ffprobe.StartEncode(prober, false)
+	// return
+	err := ffprobe.StartEncode(prober, false)
 	if err == nil {
 		ctrlStatus.Append("==============\n")
 		lblDesc.SetText("ffmpeg started succesfully")
-		readWritepipe(ffstderr)
 	} else {
 		lblDesc.SetText("ffmpeg start failed: " + err.Error())
 	}
 }
 
-func readWritepipe(scanner *bufio.Scanner) {
+func startFfoutReader() {
 	go func() {
-		count := 0
-		scanner.Split(scanLines)
-		frmtxt := ""
-		for scanner.Scan() {
-			txt := scanner.Text()
-			if strings.Contains(txt, "frame=") {
-				if count%updateFrameCount == 0 {
-					ui.QueueMain(func() {
-						frmtxt = txt
-						lblDesc.SetText(txt)
-					})
-				}
-				count++
+		for {
+			out := <-ffprobe.Ffoutchan
+			if out.FrameUpdate {
+				setStatus(out.Msg)
 			} else {
-				ui.QueueMain(func() {
-					ctrlStatus.Append(txt + "\n")
-				})
+				addInfo(out.Msg)
 			}
 		}
-		ctrlStatus.Append(frmtxt + "\nDone.\n\n\n\n")
-		ffprobe.Started = false
 	}()
-}
-
-// scanLines splits into lines for either \r or \n
-func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if atEOF && len(data) == 0 {
-		return 0, nil, nil
-	}
-	if i := bytes.IndexByte(data, '\r'); i >= 0 {
-		return i + 1, data[0:i], nil
-	}
-	if i := bytes.IndexByte(data, '\n'); i >= 0 {
-		return i + 1, data[0:i], nil
-	}
-	// If we're at EOF, we have a final, non-terminated line. Return it.
-	if atEOF {
-		return len(data), data, nil
-	}
-	// Request more data.
-	return 0, nil, nil
 }
