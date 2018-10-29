@@ -4,6 +4,6 @@ import (
 	"testing"
 )
 
-func Test_mainCli(t *testing.T) {
+func TestmainCli(t *testing.T) {
 	// mainCli()
 }

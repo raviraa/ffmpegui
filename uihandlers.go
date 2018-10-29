@@ -7,21 +7,16 @@ import (
 	"github.com/raviraa/ffmpegui/ffprobe"
 )
 
-func onStopClicked(btn *ui.Button) {
-	stopped := ffprobe.StopEncode() //TODO enable/disable start/stop buttons
-	if stopped {
-		// err := ffprobe.StartEncode(prober, true)
-		err := ffprobe.StartMux(prober)
-		if err == nil {
-			ctrlStatus.Append("==============\nMuxing streams\n")
-		} else {
-			lblDesc.SetText("ffmpeg mux start failed: " + err.Error())
-		}
-	}
-}
-
 var paused bool
 var resumeCount int
+var reqMux bool
+
+func onStopClicked(btn *ui.Button) {
+	reqMux = true
+	prober.KillEncode()
+	btnpause.Disable()
+	btnstop.Disable()
+}
 
 func onPauseClicked(btn *ui.Button) {
 	if paused {
@@ -30,11 +25,12 @@ func onPauseClicked(btn *ui.Button) {
 		onStartClicked(btn)
 		paused = false
 		btnpause.SetText("Pause")
+		btnstop.Enable()
 	} else {
-		if ffprobe.StopEncode() {
-			paused = true
-			btnpause.SetText("Resume")
-		}
+		prober.KillEncode()
+		paused = true
+		btnpause.SetText("Resume")
+		btnstop.Disable()
 	}
 }
 
@@ -48,27 +44,36 @@ func onStartClicked(btn *ui.Button) {
 	for _, i := range inps.ffinputs {
 		inpsar = append(inpsar, *i)
 	}
-	log.Info(fmt.Sprintf("%#v", inpsar))
-	ffprobe.SetInputs(inpsar, resumeCount)
+	logi.Print(fmt.Sprintf("%#v", inpsar))
+	prober.SetInputs(inpsar, resumeCount)
 	ffprobe.WriteUIOpts()
-	// return
-	err := ffprobe.StartEncode(prober, false)
-	if err == nil {
-		ctrlStatus.Append("==============\n")
-		lblDesc.SetText("ffmpeg started succesfully")
-	} else {
-		lblDesc.SetText("ffmpeg start failed: " + err.Error())
-	}
+	prober.StartEncode()
+	btn.Disable()
+	btnpause.Enable()
+	btnstop.Enable()
 }
 
 func startFfoutReader() {
 	go func() {
 		for {
 			out := <-ffprobe.Ffoutchan
-			if out.FrameUpdate {
+			switch out.Typ {
+			case ffprobe.FframeUpdate:
 				setStatus(out.Msg)
-			} else {
+			case ffprobe.Ffother:
 				addInfo(out.Msg)
+			case ffprobe.Ffdone:
+				fmt.Println(out)
+				if reqMux {
+					reqMux = false
+					prober.StartMux()
+				} else if out.Msg == "mux" {
+					resumeCount = 0
+					btnstart.Enable()
+					prober.RmTmpFiles()
+				}
+			default:
+				loge.Print("unknown msg", out)
 			}
 		}
 	}()

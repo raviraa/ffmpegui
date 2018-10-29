@@ -1,3 +1,6 @@
+package ffprobe
+
+var defaultPresetStr = `#default presets
 Ffcmdprefix = "ffmpeg -benchmark -y -loglevel verbose -hide_banner"
 
 [inputs_defaults]
@@ -39,6 +42,8 @@ codec = 'libopus'
 "b:a" = '32k'
 application = 'voip'
 af = "highpass=f=200, lowpass=f=1000"
+# TODO: -vf/-af/-filter and -filter_complex cannot be used together for the same stream.
+
 
 
 # [presets.vp9-realtime]
@@ -71,3 +76,4 @@ crf = 0
 fileext = 'aac'
 avtype = 'a'
 codec = 'aac'
+`

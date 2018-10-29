@@ -4,19 +4,19 @@ import (
 	"github.com/raviraa/ffmpegui/ffprobe"
 )
 
-var log = ffprobe.SetLogger()
+var logi, loge = ffprobe.GetLoggers()
 
 /*
 func beginCli() {
-	// log.Info("Starting in CLI")
+	// logi.Print("Starting in CLI")
 	prober := ffprobe.NewProber()
 	uiip := ffprobe.UIInput{Type: ffprobe.Video, Devidx: 2, Presetidx: 3}
 	ffprobe.SetInputs([]ffprobe.UIInput{uiip})
 	stdout, _ := ffprobe.StartEncode(prober, false)
 	readStdout(stdout)
-	log.Info("before sleep")
+	logi.Print("before sleep")
 	time.Sleep(5 * time.Second)
-	log.Info("sending stop signal")
+	logi.Print("sending stop signal")
 	ffprobe.StopEncode()
 }
 

@@ -2,18 +2,20 @@ package ffprobe
 
 type proberMac struct {
 	devicesCmd string
-	*proberCommon
 }
 
-var macProber = proberMac{
-	devicesCmd:   "ffmpeg -f avfoundation -list_devices true -i ''", //TODO move to conf file
-	proberCommon: &deviceCommon,
+func newProberMac() Prober {
+	var macProber = proberMac{
+		//TODO move to conf file
+		devicesCmd: "ffmpeg -f avfoundation -list_devices true -i ''",
+	}
+	return macProber
 }
 
-func (pm *proberMac) getDevicesCmd() string {
+func (pm proberMac) getDevicesCmd() string {
 	return pm.devicesCmd
 }
 
-func (pm *proberMac) getFfmpegCmd() ([]string, error) {
-	return getRecCmd("mac", *opts)
+func (pm proberMac) getFfmpegCmd(pc ProberCommon) ([]string, error) {
+	return pc.getRecCmd("mac", *opts)
 }

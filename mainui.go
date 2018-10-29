@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/andlabs/ui"
 	"github.com/raviraa/ffmpegui/ffprobe"
@@ -13,13 +14,14 @@ type inputControls struct {
 }
 
 var (
-	lblDesc          *ui.Label
-	ctrlStatus       *ui.MultilineEntry
-	mwin             *ui.Window
-	btnpause         *ui.Button
-	inps             *inputControls
-	prober           ffprobe.Prober
-	updateFrameCount = 9 // update frame status every n ffmpeg updates
+	lblDesc    *ui.Label
+	ctrlStatus *ui.MultilineEntry
+	mwin       *ui.Window
+	btnpause   *ui.Button
+	btnstop    *ui.Button
+	btnstart   *ui.Button
+	inps       *inputControls
+	prober     ffprobe.ProberCommon
 )
 
 func addInput(idx int, typ ffprobe.Avtype, cnfuiip *ffprobe.UIInput) {
@@ -27,7 +29,7 @@ func addInput(idx int, typ ffprobe.Avtype, cnfuiip *ffprobe.UIInput) {
 	if cnfuiip == nil {
 		uiip = ffprobe.UIInput{Devidx: -1, Presetidx: -1, Type: typ} //TODO use newInput and move ffinputs to ffprobe
 	} else {
-		// uiip = cnfuiip
+		uiip = *cnfuiip
 	}
 	inps.ffinputs = append(inps.ffinputs, &uiip)
 	fmt.Println(uiip)
@@ -65,7 +67,7 @@ func addInput(idx int, typ ffprobe.Avtype, cnfuiip *ffprobe.UIInput) {
 	cboxPresets.OnSelected(func(cb *ui.Combobox) {
 		uiip.Presetidx = cb.Selected()
 	})
-	for _, s := range ffprobe.GetPresets(uiip.Type) {
+	for _, s := range prober.GetPresets(uiip.Type) {
 		cboxPresets.Append(s)
 	}
 	if uiip.Presetidx != -1 {
@@ -78,20 +80,20 @@ func addInput(idx int, typ ffprobe.Avtype, cnfuiip *ffprobe.UIInput) {
 }
 
 func beginUIProbe() {
-	log.Info("Starting in GUI mode")
+	logi.Print("Starting in GUI mode")
 	prober = ffprobe.NewProber()
 	lblDesc.SetText(ffprobe.GetVersion())
 	startFfoutReader()
-	// for idx, uiip := range ffprobe.GetInputs() {
-	// 	addInput(idx, uiip.Type, &uiip)
-	// }
+	for idx, uiip := range ffprobe.GetInputs() {
+		addInput(idx, uiip.Type, &uiip)
+	}
 }
 
 func setupUI() {
 	mwin = ui.NewWindow("Record screen, webcam using ffmpeg", 400, 400, false)
 	mwin.SetMargined(true)
 	mwin.OnClosing(func(mw *ui.Window) bool {
-		ffprobe.StopEncode()
+		prober.KillEncode()
 		mwin.Destroy()
 		ui.Quit()
 		return false
@@ -133,13 +135,15 @@ func setupUI() {
 	btnhbox := ui.NewHorizontalBox()
 	mvbox.Append(btnhbox, false)
 
-	btnstart := ui.NewButton("Start")
+	btnstart = ui.NewButton("Start")
 	btnhbox.Append(btnstart, false)
 	btnstart.OnClicked(onStartClicked)
 	btnpause = ui.NewButton("Pause")
+	btnpause.Disable()
 	btnhbox.Append(btnpause, false)
 	btnpause.OnClicked(onPauseClicked)
-	btnstop := ui.NewButton("Stop")
+	btnstop = ui.NewButton("Stop")
+	btnstop.Disable()
 	btnstop.OnClicked(onStopClicked)
 	btnhbox.Append(btnstop, false)
 
@@ -153,7 +157,7 @@ func mainUI() {
 	if err := ui.Main(setupUI); err != nil {
 		log.Panic(err)
 	}
-	log.Info("Exiting")
+	logi.Print("Exiting")
 }
 
 func main() {

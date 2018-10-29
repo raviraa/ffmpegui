@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -12,10 +13,16 @@ import (
 	"github.com/shibukawa/configdir"
 )
 
-var config *tomlConfig
-
 // Avtype is audio video type for streams
 type Avtype int
+
+/*
+type Enum string TODO: from config to enum
+
+const (
+	EnumAbc Enum = "abc"
+	EnumDef Enum = "def"
+)*/
 
 const (
 	// Video type
@@ -31,6 +38,7 @@ type tomlConfig struct {
 	Containers     map[string][]string
 	resumeCount    int
 	Ffcmdprefix    string
+	tmpFiles       []string
 }
 
 // UIInput has config from ui for each input stream
@@ -38,7 +46,7 @@ type UIInput struct {
 	Devidx    int
 	Presetidx int
 	Type      Avtype
-	// Video_size string TODO
+	// Video_size string TODO2
 }
 
 type preset struct {
@@ -83,15 +91,17 @@ func (c *tomlConfig) mkFile(fext string, fparts ...interface{}) string {
 		s += fmt.Sprintf("%v", p)
 	}
 	s += "." + fext
+	s = filepath.Join(opts.VidPath, s)
+	c.tmpFiles = append(c.tmpFiles, s)
 	return s
 }
 
-func (c *tomlConfig) newInput(pset string) UIInput {
+func (c *tomlConfig) newInput(pset string, pc ProberCommon) UIInput {
 	ip := UIInput{Devidx: -1}
 	p, ok := c.Presets[pset]
 	if ok {
 		ip.Type = strType(p.Avtype)
-		for i, v := range GetPresets(ip.Type) {
+		for i, v := range pc.GetPresets(ip.Type) {
 			if v == pset {
 				ip.Presetidx = i
 			}
@@ -101,9 +111,9 @@ func (c *tomlConfig) newInput(pset string) UIInput {
 }
 
 // GetPresets returns available presets
-func GetPresets(typ Avtype) (ps []string) {
-	for k, p := range config.Presets {
-		if p.Avtype == typ.str() {
+func (pc ProberCommon) GetPresets(typ Avtype) (ps []string) {
+	for k, p := range pc.config.Presets {
+		if p.Avtype == typ.str() && !strings.HasPrefix(k, "capture-") {
 			ps = append(ps, k)
 		}
 	}
@@ -111,8 +121,8 @@ func GetPresets(typ Avtype) (ps []string) {
 	return
 }
 
-func getPresetByIdx(cidx int, typ Avtype) (string, error) {
-	ps := GetPresets(typ)
+func (pc ProberCommon) getPresetByIdx(cidx int, typ Avtype) (string, error) {
+	ps := pc.GetPresets(typ)
 	if cidx >= len(ps) || cidx < 0 {
 		return "", errors.New("invalid preset")
 	}
@@ -134,56 +144,56 @@ func mapToString(m map[string]interface{}) (s []string) {
 	return s
 }
 
-func loadCommonConfig(fname string) {
-	config = &tomlConfig{}
-	if _, err := toml.DecodeFile(fname, config); err != nil {
-		fmt.Println(err)
-		return
+func loadCommonConfig(confstr string) *tomlConfig {
+	config := &tomlConfig{}
+	if _, err := toml.Decode(confstr, config); err != nil {
+		panic(err)
 	}
 	readUIOpts()
+	return config
 }
 
-var cfgname string
-var uiOptsFname string
-
-func configPath() string {
-	// https://github.com/shibukawa/configdir
-	return "ffprobe/common_presets.toml" //TODO
+func presetTomlStr() string {
+	fname := configDir(presetFname)
+	b, e := ioutil.ReadFile(fname)
+	if e != nil {
+		ioutil.WriteFile(fname, []byte(defaultPresetStr), 0644)
+		return defaultPresetStr
+	}
+	return string(b)
 }
 
-func configDir() *configdir.Config {
+func configDir(fname string) string {
 	cdir := configdir.New("", "ffmpegui")
 	folders := cdir.QueryFolders(configdir.Global)
-	return folders[0]
+	return filepath.Join(folders[0].Path, fname)
 }
 
-// WriteUIOpts saves config file to user conf dir
+// WriteUIOpts saves ui selection options
 func WriteUIOpts() error {
-	dir := configDir()
-	log.Infof("writing conf to %s", dir.Path)
+	fname := configDir(uiOptsFname)
+	logi.Printf("writing conf to %s", fname)
 	var b bytes.Buffer
 	enc := toml.NewEncoder(&b)
 	err := enc.Encode(opts)
 	if err != nil {
-		log.Errorf("writing ui options failed: %s", err)
+		loge.Printf("writing ui options failed: %s", err)
 		return err
 	}
-	err = dir.WriteFile(uiOptsFname, b.Bytes())
+	err = ioutil.WriteFile(fname, b.Bytes(), 0644)
 	if err != nil {
-		log.Errorf("writing ui options failed: %s", err)
+		loge.Printf("writing ui options failed: %s", err)
 		return err
 	}
 	return nil
 }
 
-//go:generate go get -u github.com/jteeuwen/go-bindata/...
-//go:generate go-bindata -pkg $GOPACKAGE -o assets.go -prefix assets/ assets/
 func readUIOpts() error {
-	_, err := toml.DecodeFile(filepath.Join(configDir().Path, uiOptsFname), opts)
+	_, err := toml.DecodeFile(configDir(uiOptsFname), opts)
 	if err != nil {
-		log.Errorf("reading UI opts failed %s", err)
+		loge.Printf("reading UI opts failed %s", err)
 		return err
 	}
-	log.Infof("read ui options: ", opts)
+	logi.Print("read ui options: ", opts)
 	return nil
 }

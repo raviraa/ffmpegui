@@ -14,7 +14,7 @@ func runCmd(args []string, ignExitCode bool) (string, error) {
 	// args = append([]string{"-c"}, args...)
 	// cmd := exec.Command("/bin/sh", args...)
 	var out bytes.Buffer
-	log.Info(args)
+	logi.Print(args)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -25,6 +25,7 @@ func runCmd(args []string, ignExitCode bool) (string, error) {
 	}
 	return out.String(), nil
 }
+
 func runCmdStr(cmd string, ignExitCode bool) string {
 	if str, err := runCmd(strings.Split(cmd, " "), ignExitCode); err == nil {
 		return str
@@ -32,49 +33,59 @@ func runCmdStr(cmd string, ignExitCode bool) string {
 	return ""
 }
 
-func (mp *proberCommon) runCmdPipe(cmdstr []string, wait bool) error {
-	log.Info(cmdstr)
+func (mp *ProberCommon) runCmdPipe(cmdstr []string, cmdtype string) error {
+	logi.Print(cmdstr)
 	cmd := exec.Command(cmdstr[0], cmdstr[1:]...)
-	// cmd.Stderr = os.Stderr
+	mp.cmd = cmd
+	defer func() { mp.cmd = nil }()
 	cmd.Stdout = os.Stdout
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return err
-	}
 	stdout, err := cmd.StderrPipe()
 	if err != nil {
+		fferr(err)
 		return err
 	}
 	outscanner := bufio.NewScanner(stdout)
 	if err := cmd.Start(); err != nil {
+		fferr(err)
 		return err
 	}
-	go func() {
-		defer stdin.Close()
-		if wait {
-			return
-		}
-		<-mp.done
-		log.Infof("Received signal. Sending SIGINT...")
-		cmd.Process.Signal(syscall.SIGINT)
-		cmd.Wait()
-		//indicate signal sent, SIGUSR1 value is ignored
-		mp.done <- true
-		log.Info("ffmpeg stopped. ", err)
-	}()
-
 	readWritepipe(outscanner)
-	if wait {
-		err := cmd.Wait()
-		log.Info("ffmpeg stopped. ", err)
+	Ffoutchan <- Ffoutmsg{Ffother, fmt.Sprintf(
+		"\n#####\t\t%s\t\t######\n######\t\t\t#####\n", cmdtype)}
+	err = cmd.Wait()
+	excode := 0
+	if exitError, ok := err.(*exec.ExitError); ok {
+		ws := exitError.Sys().(syscall.WaitStatus)
+		excode = ws.ExitStatus()
 	}
-	return nil
+	logi.Print("ffmpeg stopped ", excode, err)
+
+	if err == nil || excode == 255 {
+		Ffoutchan <- Ffoutmsg{Ffdone, cmdtype}
+	} else {
+		Ffoutchan <- Ffoutmsg{Fferr, cmdtype}
+	}
+	return err
 }
+
+// Ffouttype is line output type
+type Ffouttype int
+
+const (
+	//Fferr when scanner return error
+	Fferr = iota
+	//Ffdone when process exited without err
+	Ffdone
+	//FframeUpdate is frame, encoding speed update line
+	FframeUpdate
+	//Ffother anything else
+	Ffother
+)
 
 // Ffoutmsg ffmpeg output line
 type Ffoutmsg struct {
-	FrameUpdate bool
-	Msg         string
+	Typ Ffouttype
+	Msg string
 }
 
 // Ffoutchan output lines from ffmpeg process
@@ -84,24 +95,25 @@ func readWritepipe(scanner *bufio.Scanner) {
 	go func() {
 		count := 0
 		scanner.Split(scanLines)
-		frmtxt := ""
 		for scanner.Scan() {
 			txt := scanner.Text()
 			if strings.Contains(txt, "frame=") {
 				if count%3 == 0 {
-					frmtxt = txt
-					// setStatus(txt)
-					Ffoutchan <- Ffoutmsg{true, txt}
+					Ffoutchan <- Ffoutmsg{FframeUpdate, txt}
 				}
 				count++
 			} else {
-				// addInfo(txt + "\n")
-				Ffoutchan <- Ffoutmsg{false, txt + "\n"}
+				Ffoutchan <- Ffoutmsg{Ffother, txt + "\n"}
 			}
 		}
-		Ffoutchan <- Ffoutmsg{false, frmtxt + "\nDone.\n\n\n\n"}
-		Started = false
+		if e := scanner.Err(); e != nil {
+			fferr(e)
+		}
 	}()
+}
+
+func fferr(e error) {
+	Ffoutchan <- Ffoutmsg{Fferr, e.Error()}
 }
 
 // scanLines splits into lines for either \r or \n
