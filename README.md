@@ -2,8 +2,11 @@
 
 
 * `ffmpeg` needs to installed for separately. Use `homebrew` for Mac and package manager for your linux distribution to install ffmpeg.
-* Recordings are stored in Desktop and configuration files are stored in [user level configuration](https://github.com/shibukawa/configdir) directory.
-* Recording is made using intermediate fast capture-{a,v} profile and seperate file for each pause/resume. And converted to seleced profile and joined together.
+* Each Pause/Resume will create a new file and all the files are joined after stop.
+* Capture is made using intermediate fast capture-{a,v} profile, then converted to seleced profile and joined together.
+* Captures are stored in Desktop and configuration files are stored in [user level configuration](https://github.com/shibukawa/configdir) directory.
+
+<img src="screenshot.png" alt="screenshot" width="50%" height="50%" />
 
 ## TODO
 
